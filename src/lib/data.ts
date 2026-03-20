@@ -1,4 +1,4 @@
-import { AdminContentDraft, AdminModerationCard, CsvRow, ImportBatch, NewsItem, Product, RawImportRow, ReviewItem, SupplierImportItem, ValidationResult, ColumnMapping } from "@/lib/types";
+import { AdminContentDraft, AdminModerationCard, CsvRow, ImportBatch, NewsItem, Product, RawImportRow, ReviewItem, SupplierImportItem, ValidationResult, ColumnMapping, EligibilityResult, RejectReason, ReviewReason, EligibleImportRow, BatchEligibilityStats } from "@/lib/types";
 
 // ========================================
 // FILE INTAKE HELPERS (Sprint 4)
@@ -103,7 +103,7 @@ export function applyMapping(rows: CsvRow[], mapping: ColumnMapping): RawImportR
   });
 }
 
-// Подсчёт статистики импорта
+// Подсчёт статистики импорта (старый формат для совместимости)
 export function getImportStats(rows: RawImportRow[]) {
   const total = rows.length;
   const valid = rows.filter(r => r.validation.isValid).length;
@@ -115,6 +115,174 @@ export function getImportStats(rows: RawImportRow[]) {
   ).length;
 
   return { total, valid, errors, warnings, reviewCandidates };
+}
+
+// ========================================
+// ELIGIBILITY GATE (Sprint 5)
+// ========================================
+
+// Ключевые слова для hard reject
+const REJECT_KEYWORDS: Record<RejectReason, string[]> = {
+  coffee: ["coffee", "кофе", "espresso", "капучино", "латте", "beans", "зёрна"],
+  mate: ["mate", "мате", "мать", "yerba", "йерба"],
+  packaging_no_core: ["пакет", "пакетик", "без", "обычная упаковка", "simple bag", " одноразов", "салфетк", "полотенце"],
+  outside_core_category: ["печенье", "конфет", "шоколад", "вода", "сок", "пиво", "алкоголь", "сигарет", "мыло", "косметик"],
+  invalid_row: ["test", "test", "xxx", "test"], // мусорные строки
+  ambiguous: [], // заполняется динамически
+};
+
+// Ключевые слова для core ассортимента
+const CORE_KEYWORDS = [
+  // Чай
+  "puer", "пуэр", "улун", "oolong", "green tea", "красный чай", "белый чай", "жасмин", "shou", "shen", "da hong pao", "тигуанинь",
+  // Чайные напитки
+  "herbal", "травяной", "fruit", "фруктовый", "rooibos", "ройбуш", "hibiscus", "каркаде",
+  // Чайная посуда
+  "gaiwan", "гайван", "teapot", "чайник", "cup", "пиала", "pitcher", "чабан", "caddy", "чайниц", "tray", "поднос", "teaware", "посуда",
+  // Подарки
+  "gift", "подарок", "набор", "сет", "шубер", "подарочн", "упаковка", "sleeve",
+];
+
+// Категории ядра
+export const CORE_CATEGORIES: Record<string, string[]> = {
+  tea: ["tea", "чай", "puer", "пуэр", "улун", "oolong", "green", "красный", "белый", "shou", "shen"],
+  "tea-drinks": ["tea-drinks", "травяной", "herbal", "fruit", "rooibos", "ройбуш"],
+  teaware: ["teaware", "gaiwan", "чайник", "пиала", "гайван", "чабан", "pitcher", "caddy"],
+  gifts: ["gift", "подарок", "набор", "шубер", "упаковка"],
+};
+
+// Определение eligibility для строки
+export function checkEligibility(row: RawImportRow): { result: EligibilityResult; reason?: RejectReason | ReviewReason } {
+  const title = (row.rawTitle || "").toLowerCase();
+  const category = (row.data[row.mapping.category || ""] || "").toLowerCase();
+  const sku = (row.supplierSku || "").
+ toLowerCase();
+
+  // Сначала проверяем hard reject правила
+  // 1. Кофе
+  if (REJECT_KEYWORDS.coffee.some(kw => title.includes(kw) || sku.includes(kw))) {
+    return { result: "hard_reject", reason: "coffee" };
+  }
+
+  // 2. Мате (матэ)
+  if (REJECT_KEYWORDS.mate.some(kw => title.includes(kw))) {
+    return { result: "hard_reject", reason: "mate" };
+  }
+
+  // 3. Нецелевая упаковка
+  if (REJECT_KEYWORDS.packaging_no_core.some(kw => title.includes(kw))) {
+    return { result: "hard_reject", reason: "packaging_no_core" };
+  }
+
+  // 4. Явно не в ассортименте
+  if (REJECT_KEYWORDS.outside_core_category.some(kw => title.includes(kw))) {
+    return { result: "hard_reject", reason: "outside_core_category" };
+  }
+
+  // 5. Мусорные строки (пустые или тестовые)
+  if (!title.trim() || REJECT_KEYWORDS.invalid_row.some(kw => title.includes(kw))) {
+    return { result: "hard_reject", reason: "invalid_row" };
+  }
+
+  // Проверяем, относится ли к core ассортименту
+  const isCoreTitle = CORE_KEYWORDS.some(kw => title.includes(kw.toLowerCase()));
+  const isCoreCategory = Object.values(CORE_CATEGORIES).some(arr => 
+    arr.some(kw => category.includes(kw.toLowerCase()))
+  );
+
+  // Не в ядре
+  if (!isCoreTitle && !isCoreCategory) {
+    return { result: "hard_reject", reason: "outside_core_category" };
+  }
+
+  // Теперь проверяем soft_review условия
+  // Неочевидная категория
+  if (isCoreTitle && !isCoreCategory && title.trim()) {
+    return { result: "soft_review", reason: "unclear_category" };
+  }
+
+  // Спорный тип товара (есть ключевые слова но неоднозначно)
+  const ambiguousCount = CORE_KEYWORDS.filter(kw => title.includes(kw.toLowerCase())).length;
+  if (ambiguousCount > 2) {
+    return { result: "soft_review", reason: "ambiguous_type" };
+  }
+
+  // Низкая уверенность из-за warnings
+  if (row.validation.warnings.length > 2) {
+    return { result: "soft_review", reason: "low_confidence" };
+  }
+
+  // PASS - всё ок
+  return { result: "pass" };
+}
+
+// Применение eligibility gate к строкам
+export function applyEligibilityGate(rows: RawImportRow[]): EligibleImportRow[] {
+  return rows.map(row => {
+    const { result, reason } = checkEligibility(row);
+    
+    const eligibleRow: EligibleImportRow = {
+      ...row,
+      eligibility: result,
+      rejectReason: result === "hard_reject" ? (reason as RejectReason) : undefined,
+      reviewReason: result === "soft_review" ? (reason as ReviewReason) : undefined,
+    };
+
+    // Создаём SupplierImportItem только для pass и soft_review
+    if (result !== "hard_reject" && row.validation.isValid) {
+      // Здесь мог бы быть transform в SupplierImportItem
+      // Для MVP оставляем заглушку
+      eligibleRow.supplierImportItem = {
+        supplierName: "", // будет заполнено из контекста
+        supplierSku: row.supplierSku || "",
+        rawTitle: row.rawTitle || "",
+        normalizedTitle: row.rawTitle || "", // MVP: просто копируем
+        suggestedCategory: "tea", // будет определено позже
+        suggestedType: "tea", // дефолт
+        unitType: "weight", // дефолт
+        costPrice: row.costPrice || 0,
+        stock: row.stock || 0,
+        stockStatus: row.stock && row.stock > 0 ? "in-stock" : "out-of-stock",
+        imageSource: row.imageSource || "",
+        confidence: row.validation.isValid ? 0.8 : 0.5,
+        confidenceLevel: row.validation.isValid ? "high" : "medium",
+        warnings: row.validation.warnings.map(w => w.message),
+        notes: [],
+        decisionNotes: [],
+        duplicationHints: [],
+        importedAt: new Date().toISOString(),
+        importBatchId: "",
+      };
+    }
+
+    return eligibleRow;
+  });
+}
+
+// Подсчёт статистики eligibility
+export function getEligibilityStats(rows: EligibleImportRow[]): BatchEligibilityStats {
+  const stats: BatchEligibilityStats = {
+    total: rows.length,
+    pass: 0,
+    softReview: 0,
+    hardReject: 0,
+    rejectReasons: { coffee: 0, mate: 0, packaging_no_core: 0, outside_core_category: 0, invalid_row: 0, ambiguous: 0 },
+    reviewReasons: { unclear_category: 0, ambiguous_type: 0, low_confidence: 0 },
+  };
+
+  rows.forEach(row => {
+    if (row.eligibility === "pass") stats.pass++;
+    else if (row.eligibility === "soft_review") {
+      stats.softReview++;
+      if (row.reviewReason) stats.reviewReasons[row.reviewReason]++;
+    }
+    else if (row.eligibility === "hard_reject") {
+      stats.hardReject++;
+      if (row.rejectReason) stats.rejectReasons[row.rejectReason]++;
+    }
+  });
+
+  return stats;
 }
 
 export const categories = [

@@ -79,6 +79,26 @@
   - Таблица результатов с детализацией проблем
 - [x] Docs: updated roadmap.md, supplier-import.md, admin-mvp.md
 
+## Phase 1.98: Eligibility Gate (Sprint 5)
+- [x] Eligibility gate foundation
+  - Типы: EligibilityResult (pass/soft_review/hard_reject)
+  - RejectReason: coffee, mate, packaging_no_core, outside_core_category, invalid_row, ambiguous
+  - ReviewReason: unclear_category, ambiguous_type, low_confidence
+- [x] Eligibility gate rules
+  - Hard reject: кофе, мате, нецелевая упаковка, вне ассортимента, мусорные строки
+  - Soft review: неясная категория, спорный тип, низкая уверенность
+  - Pass: соответствует ядру (чай, чайные напитки, посуда, подарки)
+- [x] Moderation only for eligible
+  - Hard rejected НЕ создают SupplierImportItem
+  - Только pass и soft_review идут в модерацию
+- [x] Batch eligibility stats
+  - Всего, pass, soft review, hard reject
+  - Причины reject и review
+- [x] UI updated
+  - Новый блок статистики eligibility
+  - Причины отклонения с подсчётом
+  - Причины review с подсчётом
+
 ## Phase 2: Data & Content (следующая)
 - [ ] Добавить реальные изображения в public/images
 - [ ] Подключить базу данных (CMS/Directus/Supabase)

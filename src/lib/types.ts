@@ -322,6 +322,47 @@ export type FileIntakeState = {
   supplierName: string;
 };
 
+// ========================================
+// ELIGIBILITY GATE (Sprint 5)
+// ========================================
+
+// Результат проверки eligibility
+export type EligibilityResult = "pass" | "soft_review" | "hard_reject";
+
+// Причина hard reject
+export type RejectReason = 
+  | "coffee"
+  | "mate"
+  | "packaging_no_core"
+  | "outside_core_category"
+  | "invalid_row"
+  | "ambiguous";
+
+// Причина soft review
+export type ReviewReason =
+  | "unclear_category"
+  | "ambiguous_type"
+  | "low_confidence";
+
+// Строка с eligibility
+export type EligibleImportRow = RawImportRow & {
+  eligibility: EligibilityResult;
+  rejectReason?: RejectReason;
+  reviewReason?: ReviewReason;
+  // Связанный SupplierImportItem (только для pass/soft_review)
+  supplierImportItem?: SupplierImportItem;
+};
+
+// Aгрегированная статистика по batch
+export type BatchEligibilityStats = {
+  total: number;
+  pass: number;
+  softReview: number;
+  hardReject: number;
+  rejectReasons: Record<RejectReason, number>;
+  reviewReasons: Record<ReviewReason, number>;
+};
+
 // =======================================
 
 export type AdminContentDraft = {
