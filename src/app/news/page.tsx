@@ -5,8 +5,8 @@ export default function NewsPage() {
   return (
     <div className="py-8 space-y-6">
       <div className="space-y-2">
-        <div className="eyebrow">Новости</div>
-        <h1 className="text-3xl font-semibold text-[var(--text-primary)]">Новости и обновления</h1>
+        <div className="eyebrow">Журнал</div>
+        <h1 className="text-3xl font-semibold text-[var(--text-primary)]">Публикации и обновления</h1>
         <p className="text-[var(--text-secondary)]">Контентный слой: черновики, публикации, короткие дайджесты.</p>
       </div>
 

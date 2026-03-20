@@ -45,9 +45,8 @@ export const products: Product[] = [
     image: "/images/products/puer-amber.jpg",
     inStock: true,
     price: {
-      supplierPrice: { perKg: 5200 },
-      packaging: { gramsOptions: [50, 100, 250], defaultGrams: 100, unitLabel: "г" },
-      sitePrice: { suggested: 820, overridden: 870 },
+      price: { costPrice: 520, suggestedPrice: 820, manualOverride: 870 },
+      packaging: { unitType: "weight", weightOptions: [50, 100, 250], defaultWeight: 100 },
     },
   },
   {
@@ -67,9 +66,8 @@ export const products: Product[] = [
     image: "/images/products/oolong-nectar.jpg",
     inStock: true,
     price: {
-      supplierPrice: { perKg: 7800 },
-      packaging: { gramsOptions: [50, 100], defaultGrams: 50, unitLabel: "г" },
-      sitePrice: { suggested: 1150 },
+      price: { costPrice: 390, suggestedPrice: 1150 },
+      packaging: { unitType: "weight", weightOptions: [50, 100], defaultWeight: 50 },
     },
   },
   {
@@ -87,9 +85,8 @@ export const products: Product[] = [
     image: "/images/products/teapot-zisha.jpg",
     inStock: true,
     price: {
-      supplierPrice: { perUnit: 5200 },
-      packaging: { unitLabel: "шт" },
-      sitePrice: { suggested: 8900, overridden: 9200, locked: true },
+      price: { costPrice: 5200, suggestedPrice: 8900, manualOverride: 9200, isLocked: true },
+      packaging: { unitType: "piece", maxQuantity: 1 },
     },
   },
   {
@@ -107,9 +104,8 @@ export const products: Product[] = [
     image: "/images/products/gift-warm.jpg",
     inStock: false,
     price: {
-      supplierPrice: { perPack: 2400 },
-      packaging: { unitLabel: "сет" },
-      sitePrice: { suggested: 4200 },
+      price: { costPrice: 2400, suggestedPrice: 4200 },
+      packaging: { unitType: "pack", maxQuantity: 1 },
     },
   },
 ];
@@ -145,6 +141,7 @@ export const reviews: ReviewItem[] = [
   },
 ];
 
+// MVP модерация: new → review → published
 export const adminModeration: AdminModerationCard[] = [
   {
     id: "m1",
@@ -158,7 +155,8 @@ export const adminModeration: AdminModerationCard[] = [
     confidence: "0.82",
     comment: "Нужен нейминг более тёплый и понятный",
     image: "/images/moderation/puer.jpg",
-    queue: "review",
+    status: "new",
+    updatedAt: "2026-03-20T10:00:00Z",
   },
   {
     id: "m2",
@@ -172,7 +170,8 @@ export const adminModeration: AdminModerationCard[] = [
     confidence: "0.74",
     comment: "Проверить объём и фото в реальном освещении",
     image: "/images/moderation/bowls.jpg",
-    queue: "incoming",
+    status: "review",
+    updatedAt: "2026-03-19T14:30:00Z",
   },
 ];
 
@@ -180,7 +179,7 @@ export const adminContentDrafts: AdminContentDraft[] = [
   {
     id: "d1",
     kind: "news",
-    title: "Черновик: весенний гид по подаркам",
+    title: "Черновик: весеннее руководство по подаркам",
     summary: "Подборка наборов с шуберами и мягкой упаковкой.",
     status: "draft",
   },

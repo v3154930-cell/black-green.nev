@@ -1,19 +1,23 @@
 import { notFound } from "next/navigation";
-import { products } from "@/lib/data";
+import { products, categories } from "@/lib/data";
 import type { Product } from "@/lib/types";
+import { getDisplayPrice, getUnitLabel } from "@/lib/pricing";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { FallbackImage } from "@/components/FallbackImage";
+import Link from "next/link";
 
 function PriceBlock({ product }: { product: Product }) {
-  const price = product.price.sitePrice.overridden ?? product.price.sitePrice.suggested;
-  const unit = product.price.packaging.unitLabel ?? (product.type === "tea" ? "г" : "шт");
+  const price = getDisplayPrice(product.price);
+  const unit = getUnitLabel(product.price.packaging.unitType);
 
   return (
     <div className="card-surface p-4 space-y-3">
       <div className="text-sm text-[var(--text-muted)]">Цена сайта</div>
       <div className="text-2xl font-semibold text-[var(--text-primary)]">{price} ₽</div>
       <div className="text-sm text-[var(--text-secondary)]">{product.inStock ? "В наличии" : "Ожидается"}</div>
-      {product.type === "tea" && product.price.packaging.gramsOptions ? (
+      {product.price.packaging.unitType === "weight" && product.price.packaging.weightOptions ? (
         <div className="flex flex-wrap gap-2 text-sm text-[var(--text-secondary)]">
-          {product.price.packaging.gramsOptions.map((g) => (
+          {product.price.packaging.weightOptions.map((g) => (
             <span key={g} className="surface-subtle px-3 py-1 rounded-full">{g} {unit}</span>
           ))}
         </div>
@@ -34,12 +38,29 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-export default function ProductPage({ params }: { params: { slug: string } }) {
-  const product = products.find((p) => p.slug === params.slug);
+export default async function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const product = products.find((p) => p.slug === slug);
   if (!product) return notFound();
+  
+  const category = categories.find((c) => c.slug === product.category);
 
   return (
-    <div className="py-8 space-y-8">
+    <div className="py-8 space-y-6">
+      <Breadcrumbs items={[
+        { label: "Каталог", href: "/catalog" },
+        { label: category?.title ?? product.category, href: `/catalog/${product.category}` },
+        { label: product.title },
+      ]} />
+      
+      {/* Back to catalog link */}
+      <Link 
+        href={`/catalog/${product.category}`} 
+        className="inline-flex items-center gap-1 text-sm text-[var(--text-secondary)] hover:text-brand-leaf transition-colors"
+      >
+        ← Назад в каталог
+      </Link>
+      
       <div className="space-y-2">
         <div className="eyebrow">{product.category}</div>
         <h1 className="text-3xl font-semibold text-[var(--text-primary)]">{product.title}</h1>
@@ -48,7 +69,9 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
         <div className="card-surface p-4 space-y-4">
-          <div className="relative w-full h-72 rounded-xl bg-[var(--bg-subtle)]" />
+          <div className="relative w-full aspect-[3/4] h-auto min-h-[320px] rounded-xl overflow-hidden bg-[var(--bg-subtle)]">
+            <FallbackImage src={product.image} alt={product.title} fill className="object-cover" />
+          </div>
           <Section title="Описание">
             <p>{product.description}</p>
           </Section>

@@ -41,23 +41,51 @@ export type GiftKind =
   | "packaging"
   | "sleeve";
 
-export type PriceNormalization = {
-  supplierPrice: {
-    perKg?: number;
-    perPack?: number;
-    perUnit?: number;
-  };
-  packaging: {
-    gramsOptions?: number[]; // для весового чая
-    defaultGrams?: number;
-    unitLabel?: string;
-  };
-  sitePrice: {
-    suggested: number;
-    overridden?: number;
-    locked?: boolean;
-  };
+// ========== MVP PRICE LAYER ==========
+
+// Тип единицы товара
+export type UnitType = "weight" | "pack" | "piece";
+
+// Базовая структура цены
+export type PriceInfo = {
+  /** Себестоимость (закупочная цена) */
+  costPrice: number;
+  /** Рекомендованная цена (автонаценка) */
+  suggestedPrice: number;
+  /** Ручной override (если задан — используется вместо suggested) */
+  manualOverride?: number;
+  /** Заблокирован ли ручной override */
+  isLocked?: boolean;
 };
+
+// Упаковка
+export type Packaging = {
+  /** Тип единицы */
+  unitType: UnitType;
+  /** Опции веса (только для weight) */
+  weightOptions?: number[];
+  /** Вес по умолчанию в граммах (только для weight) */
+  defaultWeight?: number;
+  /** Лимит веса (напр. 250 г — типичная максимальная фасовка) */
+  maxWeight?: number;
+  /** Лимит количества (для pack/piece) */
+  maxQuantity?: number;
+};
+
+// Полная ценовая модель товара
+export type PriceConfig = {
+  price: PriceInfo;
+  packaging: Packaging;
+};
+
+// Guardrails: результат проверки
+export type PriceGuardResult = {
+  isValid: boolean;
+  warnings: string[];
+  errors: string[];
+};
+
+// =======================================
 
 export type ProductBase = {
   id: string;
@@ -70,7 +98,7 @@ export type ProductBase = {
   image: string;
   inStock: boolean;
   badges?: string[];
-  price: PriceNormalization;
+  price: PriceConfig;
 };
 
 export type TeaProduct = ProductBase & {
@@ -116,6 +144,13 @@ export type ReviewItem = {
   productSlug?: string;
 };
 
+// MVP: упрощённая модель модерации
+// Статусы: new → review → published
+// Действия: approve, send_to_review, hide, defer
+export type ModerationStatus = "new" | "review" | "published";
+
+export type ModerationAction = "approve" | "send_to_review" | "hide" | "defer";
+
 export type AdminModerationCard = {
   id: string;
   vendor: string;
@@ -128,7 +163,8 @@ export type AdminModerationCard = {
   confidence: string;
   comment: string;
   image: string;
-  queue: "ready" | "review" | "incoming" | "rework" | "hidden";
+  status: ModerationStatus;
+  updatedAt: string; // ISO date для сортировки
 };
 
 export type AdminContentDraft = {

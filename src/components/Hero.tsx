@@ -1,7 +1,7 @@
 import { getTimeOfDay, heroScenes } from "@/lib/time-of-day";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import Image from "next/image";
+import { FallbackImage } from "./FallbackImage";
 
 type HeroProps = {
   highlightImage?: string;
@@ -43,7 +43,7 @@ export function Hero({ highlightImage = "/images/hero-tea.jpg" }: HeroProps) {
               href="/news"
               className="inline-flex items-center gap-2 rounded-xl border border-[#dfe5e1] bg-white px-4 py-2 text-[var(--text-primary)] hover:border-brand-leaf"
             >
-              Новости и гиды
+              Журнал
             </Link>
           </div>
         </div>
@@ -61,7 +61,7 @@ export function Hero({ highlightImage = "/images/hero-tea.jpg" }: HeroProps) {
             Hero обновляется под время суток: утро, день, вечер, ночь. Витрина остаётся спокойной и чистой.
           </p>
           <div className="relative h-40 w-full bg-[var(--bg-subtle)] rounded-lg overflow-hidden">
-            <Image src={highlightImage} alt="Hero highlight" fill className="object-cover" />
+            <FallbackImage src={highlightImage} alt="Hero highlight" fill className="object-cover" />
           </div>
         </div>
       </div>

@@ -1,5 +1,5 @@
-import Image from "next/image";
 import Link from "next/link";
+import { FallbackImage } from "./FallbackImage";
 
 type Props = {
   slug: string;
@@ -12,7 +12,7 @@ export function CategoryCard({ slug, title, description, image }: Props) {
   return (
     <Link href={`/catalog/${slug}`} className="card-surface overflow-hidden group">
       <div className="relative h-40 w-full bg-[var(--bg-subtle)]">
-        <Image
+        <FallbackImage
           src={image}
           alt={title}
           fill

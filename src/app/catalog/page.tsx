@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { categories, products } from "@/lib/data";
+import { CatalogSearch } from "@/components/CatalogSearch";
 
 export default function CatalogPage() {
-  const items = products;
-
   return (
     <div className="py-8 space-y-8">
       <div className="space-y-2">
@@ -13,6 +12,9 @@ export default function CatalogPage() {
       </div>
 
       <div className="flex flex-wrap gap-3">
+        <Link href="/catalog" className="link-underline text-[var(--text-primary)] font-medium">
+          Все
+        </Link>
         {categories.map((cat) => (
           <Link key={cat.slug} href={`/catalog/${cat.slug}`} className="link-underline text-[var(--text-primary)]">
             {cat.title}
@@ -20,16 +22,8 @@ export default function CatalogPage() {
         ))}
       </div>
 
-      <div className="grid-cards">
-        {items.map((item) => (
-          <Link key={item.slug} href={`/product/${item.slug}`} className="card-surface p-4 space-y-3">
-            <div className="text-sm text-[var(--text-muted)]">{item.subtitle}</div>
-            <div className="text-lg font-semibold text-[var(--text-primary)]">{item.title}</div>
-            <div className="text-sm text-[var(--text-secondary)]">{item.description}</div>
-            <div className="text-sm text-[var(--text-muted)]">Цена: {item.price.sitePrice.overridden ?? item.price.sitePrice.suggested} ₽</div>
-          </Link>
-        ))}
-      </div>
+      {/* Поиск и результаты */}
+      <CatalogSearch products={products} />
     </div>
   );
 }

@@ -1,12 +1,12 @@
-import Image from "next/image";
 import Link from "next/link";
-import { categories, news, products, reviews } from "@/lib/data";
+import { categories, products, reviews, news } from "@/lib/data";
 import { CategoryCard } from "@/components/CategoryCard";
+import { FallbackImage } from "@/components/FallbackImage";
 import { Header } from "@/components/Header";
 import { Hero } from "@/components/Hero";
-import { NewsCard } from "@/components/NewsCard";
 import { ProductCard } from "@/components/ProductCard";
 import { TopBar } from "@/components/TopBar";
+import { getDisplayPrice } from "@/lib/pricing";
 
 function Section({ title, eyebrow, children }: { title: string; eyebrow?: string; children: React.ReactNode }) {
   return (
@@ -29,7 +29,6 @@ function Pill({ children }: { children: React.ReactNode }) {
 }
 
 export default function Home() {
-  const featuredTea = products.find((p) => p.slug === "shou-puer-amber");
   const featuredGift = products.find((p) => p.type === "gift");
 
   return (
@@ -49,7 +48,7 @@ export default function Home() {
         </div>
       </Section>
 
-      {/* Хиты / популярное */}
+      {/* Хиты / популярное - ОДИН товарный блок */}
       <Section title="Популярное" eyebrow="Хиты" >
         <div className="grid-cards">
           {products.slice(0, 3).map((product) => (
@@ -58,25 +57,12 @@ export default function Home() {
         </div>
       </Section>
 
-      {/* Скидки */}
-      <Section title="Скидки" eyebrow="Акцент">
-        <div className="surface-subtle p-5 rounded-2xl border border-[#dfe5e1] flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="text-lg font-semibold text-[var(--text-primary)]">Мягкие скидки без распродажного шума</div>
-            <p className="text-sm text-[var(--text-secondary)]">Точка входа для спокойного выбора: ультра-дешёвых товаров нет, скидки точечные.</p>
-          </div>
-          <Link href="/catalog?discounts=1" className="inline-flex items-center gap-2 rounded-xl bg-brand-leaf px-4 py-2 text-white shadow-soft">
-            Посмотреть
-          </Link>
-        </div>
-      </Section>
-
       {/* Подарки */}
       <Section title="Подарки" eyebrow="Готовые наборы">
         {featuredGift ? (
           <Link href={`/product/${featuredGift.slug}`} className="card-surface p-5 flex flex-col gap-4 lg:flex-row lg:items-center">
-            <div className="relative h-44 w-full lg:w-72 rounded-xl overflow-hidden bg-[var(--bg-subtle)]">
-              <Image src={featuredGift.image} alt={featuredGift.title} fill className="object-cover" />
+            <div className="relative h-48 w-full lg:w-80 aspect-[3/4] rounded-xl overflow-hidden bg-[var(--bg-subtle)]">
+              <FallbackImage src={featuredGift.image} alt={featuredGift.title} fill className="object-cover" />
             </div>
             <div className="space-y-3 flex-1">
               <div className="eyebrow">Шубер + набор</div>
@@ -87,7 +73,7 @@ export default function Home() {
                   <Pill key={item}>{item}</Pill>
                 ))}
               </div>
-              <div className="text-sm text-[var(--text-muted)]">Цена: {featuredGift.price.sitePrice.suggested} ₽</div>
+              <div className="text-sm text-[var(--text-muted)]">Цена: {getDisplayPrice(featuredGift.price)} ₽</div>
             </div>
           </Link>
         ) : (
@@ -95,14 +81,25 @@ export default function Home() {
         )}
       </Section>
 
-      {/* Новости */}
-      <Section title="Новости" eyebrow="Контентный слой">
-        <div className="grid gap-4 sm:grid-cols-2">
-          {news.map((item) => (
-            <NewsCard key={item.slug} item={item} />
-          ))}
-        </div>
-      </Section>
+      {/* Новости - компактный блок */}
+      {news.length > 0 && (
+        <Section title="Новости и руководства" eyebrow="Контент">
+          <div className="grid gap-4 sm:grid-cols-2">
+            {news.slice(0, 3).map((item) => (
+              <Link key={item.slug} href={`/news/${item.slug}`} className="card-surface p-4 space-y-2 hover:shadow-md transition-shadow">
+                <div className="text-sm text-[var(--text-muted)]">{item.date}</div>
+                <div className="font-semibold text-[var(--text-primary)]">{item.title}</div>
+                <p className="text-sm text-[var(--text-secondary)] line-clamp-2">{item.excerpt}</p>
+              </Link>
+            ))}
+          </div>
+          <div className="mt-4">
+            <Link href="/news" className="text-sm link-underline text-[var(--text-primary)]">
+              Все публикации →
+            </Link>
+          </div>
+        </Section>
+      )}
 
       {/* Отзывы */}
       <Section title="Отзывы" eyebrow="Живые отклики">
@@ -121,40 +118,6 @@ export default function Home() {
               ) : null}
             </div>
           ))}
-        </div>
-      </Section>
-
-      {/* Преимущества */}
-      <Section title="Почему Black Green" eyebrow="Коротко">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {[
-            { title: "Фреймированный layout", text: "Центральное полотно и локальные жёлтые акценты." },
-            { title: "Карточки без шума", text: "Единый визуальный стиль: белый фон, нейтральные тени." },
-            { title: "Контентный слой", text: "Новости и отзывы живут рядом с каталогом." },
-          ].map((item) => (
-            <div key={item.title} className="surface-subtle p-4 rounded-xl space-y-2">
-              <div className="text-base font-semibold text-[var(--text-primary)]">{item.title}</div>
-              <p className="text-sm text-[var(--text-secondary)]">{item.text}</p>
-            </div>
-          ))}
-        </div>
-      </Section>
-
-      {/* MAX / Telegram */}
-      <Section title="Поддержка" eyebrow="MAX / Telegram">
-        <div className="surface-subtle p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="text-lg font-semibold text-[var(--text-primary)]">Максимум обратной связи</div>
-            <p className="text-sm text-[var(--text-secondary)]">Чат в Telegram и email-канал для быстрой модерации контента.</p>
-          </div>
-          <div className="flex gap-3">
-            <Link href="https://t.me" className="inline-flex items-center gap-2 rounded-xl bg-brand-leaf px-4 py-2 text-white shadow-soft">
-              Telegram
-            </Link>
-            <Link href="mailto:hello@blackgreen.ru" className="inline-flex items-center gap-2 rounded-xl border border-[#dfe5e1] bg-white px-4 py-2 text-[var(--text-primary)]">
-              Email
-            </Link>
-          </div>
         </div>
       </Section>
 
@@ -186,7 +149,7 @@ export default function Home() {
           <Link href="/about" className="link-underline">О магазине</Link>
           <Link href="/contacts" className="link-underline">Контакты</Link>
           <Link href="/delivery" className="link-underline">Доставка</Link>
-          <Link href="/news" className="link-underline">Новости</Link>
+          <Link href="/news" className="link-underline">Журнал</Link>
         </div>
       </footer>
     </div>

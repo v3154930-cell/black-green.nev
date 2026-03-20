@@ -21,7 +21,7 @@ export function Footer() {
           Доставка
         </Link>
         <Link href="/news" className="link-underline">
-          Новости
+          Журнал
         </Link>
       </div>
     </footer>

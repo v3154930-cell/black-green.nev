@@ -1,13 +1,28 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { categories, products } from "@/lib/data";
 import type { CategorySlug } from "@/lib/types";
+import { CatalogSearch } from "@/components/CatalogSearch";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 
-export default function CategoryPage({ params }: { params: { category: CategorySlug } }) {
-  const currentCategory = categories.find((c) => c.slug === params.category);
-  const items = products.filter((p) => p.category === params.category);
+export default async function CategoryPage({ params }: { params: Promise<{ category: CategorySlug }> }) {
+  const { category } = await params;
+  const currentCategory = categories.find((c) => c.slug === category);
+  
+  // Return 404 for non-existent categories
+  if (!currentCategory) {
+    return notFound();
+  }
+  
+  // Products are filtered in CatalogSearch component
 
   return (
-    <div className="py-8 space-y-8">
+    <div className="py-8 space-y-6">
+      <Breadcrumbs items={[
+        { label: "Каталог", href: "/catalog" },
+        { label: currentCategory.title },
+      ]} />
+      
       <div className="space-y-2">
         <div className="eyebrow">Категория</div>
         <h1 className="text-3xl font-semibold text-[var(--text-primary)]">{currentCategory?.title ?? "Каталог"}</h1>
@@ -15,27 +30,22 @@ export default function CategoryPage({ params }: { params: { category: CategoryS
       </div>
 
       <div className="flex flex-wrap gap-3">
+        <Link href="/catalog" className="link-underline text-[var(--text-primary)]">
+          Все
+        </Link>
         {categories.map((cat) => (
-          <Link key={cat.slug} href={`/catalog/${cat.slug}`} className="link-underline text-[var(--text-primary)]">
+          <Link 
+            key={cat.slug} 
+            href={`/catalog/${cat.slug}`} 
+            className={`link-underline ${cat.slug === category ? "font-medium text-[var(--leaf)]" : "text-[var(--text-primary)]"}`}
+          >
             {cat.title}
           </Link>
         ))}
       </div>
 
-      {items.length === 0 ? (
-        <div className="surface-subtle p-4 text-[var(--text-secondary)]">Нет товаров в этой категории.</div>
-      ) : (
-        <div className="grid-cards">
-          {items.map((item) => (
-            <Link key={item.slug} href={`/product/${item.slug}`} className="card-surface p-4 space-y-3">
-              <div className="text-sm text-[var(--text-muted)]">{item.subtitle}</div>
-              <div className="text-lg font-semibold text-[var(--text-primary)]">{item.title}</div>
-              <div className="text-sm text-[var(--text-secondary)]">{item.description}</div>
-              <div className="text-sm text-[var(--text-muted)]">Цена: {item.price.sitePrice.overridden ?? item.price.sitePrice.suggested} ₽</div>
-            </Link>
-          ))}
-        </div>
-      )}
+      {/* Поиск с фильтрацией по категории */}
+      <CatalogSearch products={products} initialCategory={category} />
     </div>
   );
 }
