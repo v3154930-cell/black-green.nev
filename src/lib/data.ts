@@ -103,19 +103,7 @@ export function applyMapping(rows: CsvRow[], mapping: ColumnMapping): RawImportR
   });
 }
 
-// Подсчёт статистики импорта (старый формат для совместимости)
-export function getImportStats(rows: RawImportRow[]) {
-  const total = rows.length;
-  const valid = rows.filter(r => r.validation.isValid).length;
-  const errors = rows.filter(r => r.validation.errors.length > 0).length;
-  const warnings = rows.filter(r => r.validation.warnings.length > 0).length;
-  const reviewCandidates = rows.filter(r => 
-    !r.validation.isValid || 
-    r.validation.warnings.some(w => w.field === "category")
-  ).length;
 
-  return { total, valid, errors, warnings, reviewCandidates };
-}
 
 // ========================================
 // ELIGIBILITY GATE (Sprint 5)

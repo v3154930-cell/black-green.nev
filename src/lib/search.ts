@@ -134,30 +134,7 @@ export function searchProductsInCategory(
   return searchProducts(categoryProducts, query);
 }
 
-/**
- * Подготовка к voice input (future-ready интерфейс)
- * Эта функция принимает результат распознавания речи
- * и преобразует в поисковый запрос
- */
-export function normalizeVoiceInput(voiceResult: string): SearchQuery {
-  // Базовая нормализация: удаление лишних пробелов и знаков препинания
-  return voiceResult
-    .replace(/[^\w\sа-яёА-ЯЁ]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
 
-/**
- * Интерфейс для voice input (future)
- * Пока не реализовано, но архитектура готова
- */
-export interface VoiceInputHandler {
-  start: () => void;
-  stop: () => void;
-  onResult: (transcript: string) => void;
-  onError: (error: string) => void;
-  isSupported: boolean;
-}
 
 /**
  * Проверка поддержки Web Speech API (для будущего voice input)

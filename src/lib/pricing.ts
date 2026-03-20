@@ -82,17 +82,4 @@ export function getUnitLabel(unitType: UnitType): string {
   }
 }
 
-/**
- * Рассчитать цену за единицу (для весового — за 100г)
- */
-export function getPricePerUnit(priceConfig: PriceConfig): number {
-  const display = getDisplayPrice(priceConfig);
-  const { packaging } = priceConfig;
 
-  if (packaging.unitType === "weight" && packaging.defaultWeight) {
-    // Цена за 100г
-    return Math.round((display / packaging.defaultWeight) * 100);
-  }
-
-  return display;
-}
