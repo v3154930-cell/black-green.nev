@@ -69,6 +69,79 @@ type AdminModerationCard = {
 - `src/lib/pricing.ts` — helpers (getDisplayPrice, getMargin, validatePrice)
 - `src/app/admin/moderation/page.tsx` — UI
 
+## Supplier Import Integration
+
+В Sprint 3 добавлен Supplier Import Layer — MVP-слой для работы с входящими товарами от поставщиков.
+
+### Типы
+
+```typescript
+type ConfidenceLevel = "high" | "medium" | "low";
+
+type SupplierImportItem = {
+  supplierName: string;
+  supplierSku: string;
+  rawTitle: string;
+  normalizedTitle: string;
+  suggestedCategory: CategorySlug;
+  suggestedType: Product["type"];
+  unitType: UnitType;
+  costPrice: number;
+  stock: number;
+  stockStatus: "in-stock" | "out-of-stock" | "expected";
+  imageSource: string;
+  confidence: number;
+  confidenceLevel: ConfidenceLevel;
+  warnings: string[];
+  notes: string[];
+  moderationId?: string;
+  moderationStatus?: ModerationStatus;
+  decisionNotes: DecisionNote[];
+  duplicationHints: DuplicationHint[];
+  importedAt: string;
+  importBatchId: string;
+};
+```
+
+### Decision Notes
+
+Блок с пояснениями решений системы:
+- Почему предложена категория
+- Почему выбран unit type
+- Почему confidence высокий/средний/низкий
+- Почему есть warnings
+
+### Deduplication Hints
+
+Базовые признаки возможного дубликата:
+- `slug-match` — точное совпадение slug
+- `title-similarity` — похожее название (с процентом совпадения)
+- `supplier-sku-match` — совпадение SKU поставщика
+
+### Import → Moderation Flow
+
+1. Товар импортируется как `SupplierImportItem`
+2. Автоматически связывается с `moderationStatus`:
+   - High confidence → рекомендуется сразу в `new`
+   - Medium confidence → `new` с пометкой
+   - Low confidence → `new` с warning
+3. При наличии duplication hints → обязательный review
+4. Администратор может:
+   - Создать карточку модерации
+   - Пропустить товар
+
+### UI: /admin/moderation (вкладка "Импорт поставщиков")
+
+- Статистика: всего, нуждаются в проверке, низкая уверенность, возможные дубли
+- Сводка по партиям импорта (import batches)
+- Фильтры: по confidence (high/medium/low), только с дублями
+- Карточки с:
+  - Confidence level (цветовая индикация)
+  - Связанный moderation status
+  - Decision notes block
+  - Warnings
+  - Duplication hints
+
 ## Расширение
 
 1. Добавить API (Server Actions)
@@ -76,3 +149,5 @@ type AdminModerationCard = {
 3. История изменений
 4. Роли модераторов
 5. Bulk approve/defer по фильтру
+6. Real-time matching engine для дубликатов
+7. AI-categorization для confidence

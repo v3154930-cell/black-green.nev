@@ -170,6 +170,91 @@ export type AdminModerationCard = {
   updatedAt: string; // ISO date для сортировки
 };
 
+// ========== SUPPLIER IMPORT LAYER ==========
+
+// Confidence level для входящих товаров
+export type ConfidenceLevel = "high" | "medium" | "low";
+
+// Входящий товар от поставщика (MVP - типы и моки)
+export type SupplierImportItem = {
+  // Идентификация поставщика
+  supplierName: string;
+  supplierSku: string; // Артикул поставщика / vendor code
+  
+  // Названия
+  rawTitle: string; // Оригинальное название от поставщика
+  normalizedTitle: string; // Нормализованное название (MVP - для отображения)
+  
+  // Категоризация (MVP - предложенные системой)
+  suggestedCategory: CategorySlug;
+  suggestedType: Product["type"];
+  
+  // Упаковка
+  unitType: UnitType;
+  
+  // Ценообразование
+  costPrice: number;
+  
+  // Наличие
+  stock: number; // Количество на складе (0 = нет)
+  stockStatus: "in-stock" | "out-of-stock" | "expected";
+  
+  // Изображение
+  imageSource: string;
+  
+  // Confidence score (0-1)
+  confidence: number;
+  confidenceLevel: ConfidenceLevel;
+  
+  // Warnings / notes от системы
+  warnings: string[];
+  notes: string[];
+  
+  // Связь с модерацией
+  moderationId?: string; // Связанная карточка модерации
+  moderationStatus?: ModerationStatus;
+  
+  // Decision notes (почему приняты решения)
+  decisionNotes: DecisionNote[];
+  
+  // Deduplication hints
+  duplicationHints: DuplicationHint[];
+  
+  // Метаданные импорта
+  importedAt: string;
+  importBatchId: string;
+};
+
+// Decision note - пояснение к решению системы
+export type DecisionNote = {
+  field: string;
+  reason: string;
+  confidence: ConfidenceLevel;
+};
+
+// Deduplication hint - признак возможного дубликата
+export type DuplicationHint = {
+  type: "slug-match" | "title-similarity" | "supplier-sku-match";
+  matchedProductSlug?: string;
+  matchedProductTitle?: string;
+  similarity?: number; // 0-1 для title-similarity
+  severity: "high" | "medium" | "low";
+};
+
+// Batch импорта (для UI)
+export type ImportBatch = {
+  id: string;
+  supplierName: string;
+  importedAt: string;
+  totalItems: number;
+  newItems: number;
+  reviewItems: number;
+  publishedItems: number;
+  status: "pending" | "processed" | "partial";
+};
+
+// =======================================
+
 export type AdminContentDraft = {
   id: string;
   kind: "news" | "review-reply";

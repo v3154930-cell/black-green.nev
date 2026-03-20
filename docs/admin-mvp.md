@@ -113,6 +113,31 @@ type AdminContentDraft = {
   summary: string;
   status: "draft" | "needs-review" | "needs-fix";
 };
+
+// Supplier Import (Sprint 3)
+type SupplierImportItem = {
+  supplierName: string;
+  supplierSku: string;
+  rawTitle: string;
+  normalizedTitle: string;
+  suggestedCategory: CategorySlug;
+  suggestedType: Product["type"];
+  unitType: UnitType;
+  costPrice: number;
+  stock: number;
+  stockStatus: "in-stock" | "out-of-stock" | "expected";
+  imageSource: string;
+  confidence: number;
+  confidenceLevel: ConfidenceLevel;
+  warnings: string[];
+  notes: string[];
+  moderationId?: string;
+  moderationStatus?: ModerationStatus;
+  decisionNotes: DecisionNote[];
+  duplicationHints: DuplicationHint[];
+  importedAt: string;
+  importBatchId: string;
+};
 ```
 
 ## Моки
@@ -121,6 +146,64 @@ type AdminContentDraft = {
 - `adminModeration` — 5 карточек с разными статусами
 - `adminContentDrafts` — 2 черновика
 - `news` — опубликованные новости
+- `supplierImports` — 5 входящих товаров от поставщиков
+- `importBatches` — 2 партии импорта
+
+## Supplier Import (Sprint 3)
+
+### Вкладка "Импорт поставщиков"
+
+Добавлена вторая вкладка на странице `/admin/moderation`:
+
+```
+[ Модерация ] [ Импорт поставщиков (5) ]
+```
+
+### Статистика импорта
+- Всего импортов
+- Нуждаются в проверке (new + review)
+- Низкая уверенность
+- Возможные дубли
+
+### Партии импорта (Import Batches)
+- Поставщик
+- Дата импорта
+- Кол-во позиций
+- Статус (pending/processed/partial)
+
+### Фильтры
+- По confidence: Все / Высокая / Средняя / Низкая
+- Чекбокс: "Только с дублями"
+
+### Карточка импорта
+- Confidence level (цветовая индикация)
+- Связанный moderation status
+- Название (нормализованное + оригинальное)
+- Поставщик, SKU
+- Категория, тип единицы, себестоимость, остаток
+- **Decision Notes block** — пояснения системы
+- **Warnings** — если есть
+- **Duplication Hints** — если возможен дубль
+- Кнопки: Создать карточку / Пропустить
+
+### Decision Notes Block
+
+Компактный блок с пояснениями решений:
+```
+РЕШЕНИЯ СИСТЕМЫ
+category: Тип чая: шу пуэр → категория 'tea'
+unitType: Чай на вес → weight
+confidence: Проверенный поставщик + точное совпадение типа
+```
+
+### Duplication Hints
+
+Блок предупреждения о возможном дубликате:
+```
+🔍 ВОЗМОЖНЫЙ ДУБЛЬ
+⚡ Точное совпадение slug: bowl-white-clay
+🔍 Похожее название (88%): Пиала белая глина 180мл [высокая вероятность]
+```
 
 ## Ограничения MVP
 

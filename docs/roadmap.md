@@ -28,6 +28,29 @@
 - [x] Улучшенный /admin/content для Журнала
 - [x] Docs: admin-mvp, moderation-model, pricing-layer
 
+## Phase 1.9: Supplier Import + Moderation Workflow MVP ✅ (Sprint 3)
+- [x] Supplier Import foundation (типы + моки)
+  - supplierName, supplierSku, rawTitle, normalizedTitle
+  - suggestedCategory, unitType, costPrice, stock
+  - imageSource, confidence, warnings/notes
+- [x] Import → moderation flow
+  - Связь с moderation status (new/review/published)
+  - Confidence levels (high/medium/low)
+  - Items с низкой confidence → candidate for review
+- [x] Basic deduplication hints
+  - slug match, title similarity, supplier SKU match
+  - Severity indicator (high/medium/low)
+- [x] Decision notes block
+  - Почему предложена категория
+  - Почему выбран unit type
+  - Почему есть warning
+  - Почему confidence высокий/средний/низкий
+- [x] Admin integration
+  - Вкладка "Импорт поставщиков" в /admin/moderation
+  - Import batches summary
+  - Фильтры по confidence и дубликатам
+- [x] Docs: supplier-import.md, updated moderation-model.md, admin-mvp.md
+
 ## Phase 2: Data & Content (следующая)
 - [ ] Добавить реальные изображения в public/images
 - [ ] Подключить базу данных (CMS/Directus/Supabase)
