@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { adminModeration, adminContentDrafts, products } from "@/lib/data";
-import { getDisplayPrice, getMargin } from "@/lib/pricing";
+import { getMargin } from "@/lib/pricing";
 
 const links = [
   { href: "/admin/moderation", label: "Модерация товаров", desc: "new → review → published" },

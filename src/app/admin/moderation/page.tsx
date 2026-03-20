@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { adminModeration, supplierImports, importBatches } from "@/lib/data";
+import { adminModeration, supplierImports, importBatches, mockCsvData, mockCsvColumns, defaultMapping, applyMapping, getImportStats } from "@/lib/data";
 import { getDisplayPrice, getMargin, getUnitLabel, validatePrice } from "@/lib/pricing";
-import type { ModerationStatus, ModerationAction, PriceConfig, ConfidenceLevel, SupplierImportItem } from "@/lib/types";
+import type { ModerationStatus, ModerationAction, ConfidenceLevel, SupplierImportItem, ColumnMapping, RawImportRow, MappingField } from "@/lib/types";
 
 // Метки статусов
 const statusLabels: Record<ModerationStatus, string> = {
@@ -39,8 +39,8 @@ const groupedByStatus = adminModeration.reduce((acc, item) => {
 export default function AdminModerationPage() {
   // Фильтр по статусу
   const [filter, setFilter] = useState<ModerationStatus | "all">("all");
-  // Вкладка: moderation или import
-  const [tab, setTab] = useState<"moderation" | "import">("moderation");
+  // Вкладка: moderation, import или file-intake
+  const [tab, setTab] = useState<"moderation" | "import" | "file-intake">("moderation");
   // Bulk selection
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
@@ -96,18 +96,30 @@ export default function AdminModerationPage() {
               : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
           }`}
         >
-          Импорт поставщиков
+          Импорт
           {supplierImports.length > 0 && (
             <span className="ml-2 px-2 py-0.5 text-xs bg-brand-leaf/10 text-brand-leaf rounded-full">
               {supplierImports.length}
             </span>
           )}
         </button>
+        <button
+          onClick={() => setTab("file-intake")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            tab === "file-intake"
+              ? "border-brand-leaf text-brand-leaf"
+              : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+          }`}
+        >
+          Загрузка файла
+        </button>
       </div>
 
       {/* Content based on tab */}
       {tab === "import" ? (
         <SupplierImportSection />
+      ) : tab === "file-intake" ? (
+        <FileIntakeSection />
       ) : (
         <>
         {/* Stats summary */}
@@ -636,6 +648,311 @@ function ModerationCard({
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+// ========================================
+// File Intake Section (Sprint 4)
+// ========================================
+
+function FileIntakeSection() {
+  const [step, setStep] = useState<"upload" | "mapping" | "preview">("upload");
+  const [supplierName, setSupplierName] = useState("");
+  const [rows, setRows] = useState<RawImportRow[]>([]);
+  const [mapping, setMapping] = useState<ColumnMapping>(defaultMapping);
+  const [columns, setColumns] = useState<string[]>([]);
+
+  // Имитация загрузки файла
+  const handleFileUpload = () => {
+    // Мок: используем тестовые данные
+    setColumns(mockCsvColumns);
+    setRows(applyMapping(mockCsvData, defaultMapping));
+    setStep("mapping");
+  };
+
+  // Обновить маппинг
+  const updateMapping = (field: MappingField, column: string) => {
+    setMapping(prev => ({ ...prev, [field]: column || null }));
+  };
+
+  // Применить маппинг
+  const applyCurrentMapping = () => {
+    const mappedRows = applyMapping(mockCsvData, mapping);
+    setRows(mappedRows);
+    setStep("preview");
+  };
+
+  // Статистика
+  const stats = rows.length > 0 ? getImportStats(rows) : null;
+
+  // Название полей маппинга
+  const mappingFields: { key: MappingField; label: string }[] = [
+    { key: "supplierSku", label: "SKU поставщика" },
+    { key: "rawTitle", label: "Название" },
+    { key: "costPrice", label: "Цена" },
+    { key: "stock", label: "Остаток" },
+    { key: "imageSource", label: "Изображение" },
+    { key: "category", label: "Категория" },
+    { key: "unitType", label: "Тип единицы" },
+  ];
+
+  if (step === "upload") {
+    return (
+      <div className="space-y-6">
+        <div className="surface-subtle p-6 rounded-lg">
+          <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">
+            Загрузка файла поставщика
+          </h3>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
+                Название поставщика
+              </label>
+              <input
+                type="text"
+                value={supplierName}
+                onChange={(e) => setSupplierName(e.target.value)}
+                placeholder="Например: Yunnan Craft"
+                className="w-full px-3 py-2 border border-[#dfe5e1] rounded-lg"
+              />
+            </div>
+
+            <div className="border-2 border-dashed border-[#dfe5e1] rounded-lg p-8 text-center">
+              <div className="text-4xl mb-2">📄</div>
+              <div className="text-[var(--text-primary)] font-medium mb-1">
+                Перетащите файл сюда
+              </div>
+              <div className="text-sm text-[var(--text-muted)] mb-4">
+                или нажмите для выбора
+              </div>
+              <div className="text-xs text-[var(--text-muted)]">
+                Поддерживается: CSV, XLSX
+              </div>
+              <button
+                onClick={handleFileUpload}
+                className="mt-4 px-4 py-2 bg-brand-leaf text-white rounded-lg"
+              >
+                Загрузить тестовый файл (мок)
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (step === "mapping") {
+    return (
+      <div className="space-y-6">
+        <div className="surface-subtle p-4 rounded-lg">
+          <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">
+            Сопоставление колонок
+          </h3>
+          <p className="text-sm text-[var(--text-muted)]">
+            Найдите соответствующие колонки в файле
+          </p>
+        </div>
+
+        {/* Supplier name */}
+        <div className="surface-subtle p-4 rounded-lg">
+          <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
+            Поставщик
+          </label>
+          <input
+            type="text"
+            value={supplierName}
+            onChange={(e) => setSupplierName(e.target.value)}
+            className="w-full px-3 py-2 border border-[#dfe5e1] rounded-lg"
+          />
+        </div>
+
+        {/* Mapping fields */}
+        <div className="surface-subtle p-4 rounded-lg space-y-3">
+          {mappingFields.map(field => (
+            <div key={field.key} className="flex items-center gap-4">
+              <label className="w-40 text-sm font-medium text-[var(--text-primary)]">
+                {field.label}
+              </label>
+              <select
+                value={mapping[field.key] || ""}
+                onChange={(e) => updateMapping(field.key, e.target.value)}
+                className="flex-1 px-3 py-2 border border-[#dfe5e1] rounded-lg"
+              >
+                <option value="">— Не выбрано —</option>
+                {columns.map(col => (
+                  <option key={col} value={col}>{col}</option>
+                ))}
+              </select>
+            </div>
+          ))}
+        </div>
+
+        {/* Preview of first 3 rows */}
+        <div className="surface-subtle p-4 rounded-lg">
+          <h4 className="text-sm font-medium text-[var(--text-primary)] mb-3">
+            Предпросмотр (первые 3 строки)
+          </h4>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[#e4e9e6]">
+                  {columns.map(col => (
+                    <th key={col} className="px-2 py-1 text-left text-[var(--text-muted)]">
+                      {col}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {mockCsvData.slice(0, 3).map((row, idx) => (
+                  <tr key={idx} className="border-b border-[#e4e9e6]">
+                    {columns.map(col => (
+                      <td key={col} className="px-2 py-1 text-[var(--text-secondary)]">
+                        {row[col]}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-3">
+          <button
+            onClick={() => setStep("upload")}
+            className="px-4 py-2 border border-[#dfe5e1] rounded-lg text-[var(--text-primary)]"
+          >
+            Назад
+          </button>
+          <button
+            onClick={applyCurrentMapping}
+            className="px-4 py-2 bg-brand-leaf text-white rounded-lg"
+          >
+            Применить и проверить
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Preview step
+  return (
+    <div className="space-y-6">
+      {/* Import Stats */}
+      {stats && (
+        <div className="grid gap-3 sm:grid-cols-5">
+          <div className="surface-subtle p-3 rounded-lg">
+            <div className="text-xs text-[var(--text-muted)]">Всего строк</div>
+            <div className="text-xl font-semibold text-[var(--text-primary)]">{stats.total}</div>
+          </div>
+          <div className="surface-subtle p-3 rounded-lg">
+            <div className="text-xs text-[var(--text-muted)]">Валидных</div>
+            <div className="text-xl font-semibold text-green-600">{stats.valid}</div>
+          </div>
+          <div className="surface-subtle p-3 rounded-lg">
+            <div className="text-xs text-[var(--text-muted)]">С ошибками</div>
+            <div className="text-xl font-semibold text-red-600">{stats.errors}</div>
+          </div>
+          <div className="surface-subtle p-3 rounded-lg">
+            <div className="text-xs text-[var(--text-muted)]">С предупреждениями</div>
+            <div className="text-xl font-semibold text-amber-600">{stats.warnings}</div>
+          </div>
+          <div className="surface-subtle p-3 rounded-lg">
+            <div className="text-xs text-[var(--text-muted)]">На проверку</div>
+            <div className="text-xl font-semibold text-blue-600">{stats.reviewCandidates}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Rows table */}
+      <div className="surface-subtle p-4 rounded-lg">
+        <div className="flex justify-between items-center mb-4">
+          <h4 className="text-sm font-medium text-[var(--text-primary)]">
+            Результат импорта
+          </h4>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setStep("mapping")}
+              className="px-3 py-1.5 text-sm border border-[#dfe5e1] rounded-lg"
+            >
+              Изменить маппинг
+            </button>
+            <button
+              onClick={() => alert(`Импортировано ${stats?.valid} позиций`) }
+              className="px-3 py-1.5 text-sm bg-brand-leaf text-white rounded-lg"
+            >
+              Импортировать
+            </button>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-[#e4e9e6]">
+                <th className="px-2 py-2 text-left text-[var(--text-muted)] w-12">#</th>
+                <th className="px-2 py-2 text-left text-[var(--text-muted)]">SKU</th>
+                <th className="px-2 py-2 text-left text-[var(--text-muted)]">Название</th>
+                <th className="px-2 py-2 text-left text-[var(--text-muted)]">Цена</th>
+                <th className="px-2 py-2 text-left text-[var(--text-muted)]">Остаток</th>
+                <th className="px-2 py-2 text-left text-[var(--text-muted)]">Статус</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(row => (
+                <tr key={row.rowIndex} className="border-b border-[#e4e9e6]">
+                  <td className="px-2 py-2 text-[var(--text-muted)]">{row.rowIndex}</td>
+                  <td className="px-2 py-2 text-[var(--text-primary)]">{row.supplierSku || '—'}</td>
+                  <td className="px-2 py-2 text-[var(--text-primary)]">{row.rawTitle || '—'}</td>
+                  <td className="px-2 py-2 text-[var(--text-secondary)]">{row.costPrice} ₽</td>
+                  <td className="px-2 py-2 text-[var(--text-secondary)]">{row.stock}</td>
+                  <td className="px-2 py-2">
+                    {row.validation.errors.length > 0 ? (
+                      <span className="text-xs px-2 py-0.5 rounded bg-red-100 text-red-700">
+                        Ошибка
+                      </span>
+                    ) : row.validation.warnings.length > 0 ? (
+                      <span className="text-xs px-2 py-0.5 rounded bg-amber-100 text-amber-700">
+                        Предупреждение
+                      </span>
+                    ) : (
+                      <span className="text-xs px-2 py-0.5 rounded bg-green-100 text-green-700">
+                        ОК
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Error/Warning details */}
+        {rows.some(r => r.validation.errors.length > 0 || r.validation.warnings.length > 0) && (
+          <div className="mt-4 p-4 bg-[var(--bg-subtle)] rounded-lg">
+            <h5 className="text-sm font-medium text-[var(--text-primary)] mb-2">
+              Детали проблем
+            </h5>
+            <div className="space-y-2 max-h-40 overflow-y-auto">
+              {rows.filter(r => r.validation.errors.length > 0 || r.validation.warnings.length > 0).map(row => (
+                <div key={row.rowIndex} className="text-xs">
+                  <span className="font-medium text-[var(--text-primary)]">Строка {row.rowIndex}:</span>
+                  {row.validation.errors.map((err, i) => (
+                    <div key={i} className="text-red-600 ml-2">❌ {err.message}</div>
+                  ))}
+                  {row.validation.warnings.map((warn, i) => (
+                    <div key={i} className="text-amber-600 ml-2">⚠️ {warn.message}</div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

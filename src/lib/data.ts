@@ -1,4 +1,121 @@
-import { AdminContentDraft, AdminModerationCard, ImportBatch, NewsItem, Product, ReviewItem, SupplierImportItem } from "@/lib/types";
+import { AdminContentDraft, AdminModerationCard, CsvRow, ImportBatch, NewsItem, Product, RawImportRow, ReviewItem, SupplierImportItem, ValidationResult, ColumnMapping } from "@/lib/types";
+
+// ========================================
+// FILE INTAKE HELPERS (Sprint 4)
+// ========================================
+
+// Мок CSV данные для preview
+export const mockCsvData: CsvRow[] = [
+  { "SKU": "YC-PUER-2019-100", "Название": "Shou Puer Tea 2019 Linzhang", "Цена": "2800", "Остаток": "50", "Картинка": "/images/puer.jpg", "Категория": "tea", "Тип": "weight" },
+  { "SKU": "TAS-GAIWAN-120-W", "Название": "Gaiwan White Ceramic 120ml", "Цена": "850", "Остаток": "0", "Картинка": "/images/gaiwan.jpg", "Категория": "teaware", "Тип": "piece" },
+  { "SKU": "FG-DHP-CLASSIC-50", "Название": "Da Hong Pao Classic 2024", "Цена": "1800", "Остаток": "30", "Картинка": "/images/dahongpao.jpg", "Категория": "tea", "Тип": "weight" },
+  { "SKU": "GM-GREEN-LU-50", "Название": "Green Tea Lu Shan", "Цена": "520", "Остаток": "100", "Картинка": "/images/green.jpg", "Категория": "", "Тип": "weight" },
+  { "SKU": "CP-BOWL-WHITE-150", "Название": "", "Цена": "1200", "Остаток": "25", "Картинка": "/images/bowl.jpg", "Категория": "teaware", "Тип": "piece" },
+  { "SKU": "", "Название": "White Clay Bowl 150ml", "Цена": "-100", "Остаток": "25", "Картинка": "", "Категория": "teaware", "Тип": "piece" },
+];
+
+// Мок колонок
+export const mockCsvColumns = ["SKU", "Название", "Цена", "Остаток", "Картинка", "Категория", "Тип"];
+
+// Дефолтный маппинг
+export const defaultMapping: ColumnMapping = {
+  supplierSku: "SKU",
+  rawTitle: "Название",
+  costPrice: "Цена",
+  stock: "Остаток",
+  imageSource: "Картинка",
+  category: "Категория",
+  unitType: "Тип",
+};
+
+// Валидация одной строки
+export function validateRow(row: CsvRow, mapping: ColumnMapping): ValidationResult {
+  const errors: ValidationResult["errors"] = [];
+  const warnings: ValidationResult["warnings"] = [];
+
+  const sku = row[mapping.supplierSku || ""] || "";
+  const title = row[mapping.rawTitle || ""] || "";
+  const priceStr = row[mapping.costPrice || ""] || "";
+  const stockStr = row[mapping.stock || ""] || "0";
+  const category = row[mapping.category || ""] || "";
+  const unitType = row[mapping.unitType || ""] || "";
+
+  // Errors
+  if (!sku.trim()) {
+    errors.push({ field: "supplierSku", message: "Отсутствует SKU" });
+  }
+
+  if (!title.trim()) {
+    errors.push({ field: "rawTitle", message: "Отсутствует название" });
+  }
+
+  if (!priceStr.trim()) {
+    errors.push({ field: "costPrice", message: "Отсутствует цена" });
+  } else {
+    const price = parseFloat(priceStr);
+    if (isNaN(price) || price < 0) {
+      errors.push({ field: "costPrice", message: "Некорректная цена" });
+    }
+  }
+
+  // Warnings
+  if (!category.trim()) {
+    warnings.push({ field: "category", message: "Не указана категория" });
+  }
+
+  if (!unitType.trim()) {
+    warnings.push({ field: "unitType", message: "Не указан тип единицы" });
+  }
+
+  if (!row[mapping.imageSource || ""]?.trim()) {
+    warnings.push({ field: "imageSource", message: "Нет изображения" });
+  }
+
+  // Check for negative stock
+  const stock = parseInt(stockStr, 10);
+  if (!isNaN(stock) && stock < 0) {
+    warnings.push({ field: "stock", message: "Отрицательный остаток" });
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+    warnings,
+  };
+}
+
+// Применение маппинга к строкам
+export function applyMapping(rows: CsvRow[], mapping: ColumnMapping): RawImportRow[] {
+  return rows.map((data, index) => {
+    const validation = validateRow(data, mapping);
+
+    return {
+      rowIndex: index + 1,
+      data,
+      mapping,
+      validation,
+      supplierSku: data[mapping.supplierSku || ""] || undefined,
+      rawTitle: data[mapping.rawTitle || ""] || undefined,
+      costPrice: parseFloat(data[mapping.costPrice || ""] || "0"),
+      stock: parseInt(data[mapping.stock || ""] || "0", 10),
+      imageSource: data[mapping.imageSource || ""] || undefined,
+    };
+  });
+}
+
+// Подсчёт статистики импорта
+export function getImportStats(rows: RawImportRow[]) {
+  const total = rows.length;
+  const valid = rows.filter(r => r.validation.isValid).length;
+  const errors = rows.filter(r => r.validation.errors.length > 0).length;
+  const warnings = rows.filter(r => r.validation.warnings.length > 0).length;
+  const reviewCandidates = rows.filter(r => 
+    !r.validation.isValid || 
+    r.validation.warnings.some(w => w.field === "category")
+  ).length;
+
+  return { total, valid, errors, warnings, reviewCandidates };
+}
 
 export const categories = [
   {
@@ -240,6 +357,8 @@ export const adminModeration: AdminModerationCard[] = [
   },
 ];
 
+// ========================================
+// SUPPLIER IMPORT (Sprint 3)
 // MVP Supplier Import: входящие товары от поставщиков
 export const supplierImports: SupplierImportItem[] = [
   {

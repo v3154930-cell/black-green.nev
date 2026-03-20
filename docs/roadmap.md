@@ -46,10 +46,38 @@
   - Почему есть warning
   - Почему confidence высокий/средний/низкий
 - [x] Admin integration
-  - Вкладка "Импорт поставщиков" в /admin/moderation
+  - Вкладка "Импорт" в /admin/moderation
   - Import batches summary
   - Фильтры по confidence и дубликатам
 - [x] Docs: supplier-import.md, updated moderation-model.md, admin-mvp.md
+
+## Phase 1.95: Supplier File Intake MVP ✅ (Sprint 4)
+- [x] File intake foundation
+  - CsvRow, ColumnMapping, ValidationResult types
+  - Мок CSV данные для preview
+  - Функции валидации (validateRow, applyMapping, getImportStats)
+- [x] Upload + preview
+  - Вкладка "Загрузка файла" в /admin/moderation
+  - Drag & drop UI (мок)
+  - Preview первых строк
+  - Информация о файле (имя, кол-во строк, колонки)
+- [x] Column mapping UI
+  - Маппинг полей: supplierSku, rawTitle, costPrice, stock, imageSource, category, unitType
+  - Dropdown для выбора колонки
+  - Предпросмотр с маппингом
+- [x] Validation rules
+  - Пустое название → error
+  - Нет цены → error
+  - Отрицательная цена → error
+  - Нет SKU → error
+  - Нет категории → warning
+  - Нет типа единицы → warning
+  - Нет изображения → warning
+  - Отрицательный остаток → warning
+- [x] Import batch summary
+  - Всего строк, валидных, с ошибками, с предупреждениями, candidates for review
+  - Таблица результатов с детализацией проблем
+- [x] Docs: updated roadmap.md, supplier-import.md, admin-mvp.md
 
 ## Phase 2: Data & Content (следующая)
 - [ ] Добавить реальные изображения в public/images

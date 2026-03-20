@@ -254,6 +254,75 @@ export type ImportBatch = {
 };
 
 // =======================================
+// FILE INTAKE LAYER (Sprint 4)
+// =======================================
+
+// Строка CSV файла (сырые данные)
+export type CsvRow = Record<string, string>;
+
+// Предложенные маппинги колонок
+export type ColumnMapping = {
+  supplierSku: string | null;
+  rawTitle: string | null;
+  costPrice: string | null;
+  stock: string | null;
+  imageSource: string | null;
+  category: string | null;
+  unitType: string | null;
+};
+
+// Доступные поля для маппинга
+export type MappingField = keyof ColumnMapping;
+
+// Результат валидации одной строки
+export type ValidationResult = {
+  isValid: boolean;
+  errors: ValidationError[];
+  warnings: ValidationWarning[];
+};
+
+export type ValidationError = {
+  field: string;
+  message: string;
+};
+
+export type ValidationWarning = {
+  field: string;
+  message: string;
+};
+
+// Сырая строка с результатами валидации
+export type RawImportRow = {
+  rowIndex: number;
+  data: CsvRow;
+  mapping: ColumnMapping;
+  validation: ValidationResult;
+  // Извлечённые значения
+  supplierSku?: string;
+  rawTitle?: string;
+  costPrice?: number;
+  stock?: number;
+  imageSource?: string;
+};
+
+// Метаданные загруженного файла
+export type FileIntakeMeta = {
+  fileName: string;
+  fileSize: number;
+  rowCount: number;
+  columns: string[];
+  uploadedAt: string;
+};
+
+// Состояние file intake процесса
+export type FileIntakeState = {
+  meta: FileIntakeMeta | null;
+  rows: RawImportRow[];
+  mapping: ColumnMapping;
+  supplierName: string;
+};
+
+// =======================================
 
 export type AdminContentDraft = {
   id: string;
