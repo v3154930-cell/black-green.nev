@@ -1,7 +1,7 @@
 "use client";
 
 import Image, { ImageProps } from "next/image";
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 type FallbackImageProps = Omit<ImageProps, "onError"> & {
   fallbackSrc?: string;
@@ -16,9 +16,14 @@ export function FallbackImage({
   ...props
 }: FallbackImageProps) {
   const [error, setError] = useState(false);
+  const errorRef = useRef(false);
 
   const handleError = () => {
-    setError(true);
+    // Use ref to track error without triggering re-renders
+    if (!errorRef.current) {
+      errorRef.current = true;
+      setError(true);
+    }
   };
 
   // Use fallback when there's an error or src is missing

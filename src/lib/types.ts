@@ -157,7 +157,10 @@ export type AdminModerationCard = {
   proposedName: string;
   type: Product["type"];
   category: CategorySlug;
+  /** Цена для отображения (старое поле, для совместимости) */
   price: number;
+  /** Pricing layer: собирается из PriceConfig */
+  priceConfig?: PriceConfig;
   stock: string;
   photoSource: string;
   confidence: string;

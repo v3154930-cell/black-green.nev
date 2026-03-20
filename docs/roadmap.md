@@ -21,6 +21,13 @@
 - [x] Активные состояния навигации (Header)
 - [x] Улучшенная навигация категорий
 
+## Phase 1.75: Admin MVP Refinement ✅ (Sprint 2)
+- [x] Улучшенная главная /admin с summary-блоками
+- [x] Модерация с фильтрами и bulk-логикой
+- [x] Pricing layer в карточках модерации
+- [x] Улучшенный /admin/content для Журнала
+- [x] Docs: admin-mvp, moderation-model, pricing-layer
+
 ## Phase 2: Data & Content (следующая)
 - [ ] Добавить реальные изображения в public/images
 - [ ] Подключить базу данных (CMS/Directus/Supabase)
