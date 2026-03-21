@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import { adminModeration, supplierImports, importBatches, mockCsvData, mockCsvColumns, defaultMapping, applyMapping, applyEligibilityGate, getEligibilityStats } from "@/lib/data";
-import { FileUploader } from "@/components/FileUploader";
 import { getDisplayPrice, getMargin, getUnitLabel, validatePrice } from "@/lib/pricing";
 import type { ModerationStatus, ModerationAction, ConfidenceLevel, SupplierImportItem, ColumnMapping, MappingField, EligibleImportRow, BatchEligibilityStats } from "@/lib/types";
 
@@ -120,7 +119,7 @@ export default function AdminModerationPage() {
       {tab === "import" ? (
         <SupplierImportSection />
       ) : tab === "file-intake" ? (
-        <FileUploader />
+        <FileIntakeSection />
       ) : (
         <>
         {/* Stats summary */}
@@ -657,7 +656,7 @@ function ModerationCard({
 // File Intake Section (Sprint 4)
 // ========================================
 
-function FileIntakeSection() {
+export function FileIntakeSection() {
   const [step, setStep] = useState<"upload" | "mapping" | "preview">("upload");
   const [supplierName, setSupplierName] = useState("");
   const [eligibleRows, setEligibleRows] = useState<EligibleImportRow[]>([]);
