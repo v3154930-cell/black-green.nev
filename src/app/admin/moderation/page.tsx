@@ -695,8 +695,8 @@ function FileIntakeSection() {
     { key: "costPrice", label: "Цена" },
     { key: "stock", label: "Остаток" },
     { key: "imageSource", label: "Изображение" },
-    { key: "category", label: "Категория" },
-    { key: "unitType", label: "Тип единицы" },
+    { key: "categoryHint", label: "Категория" },
+    { key: "typeHint", label: "Тип единицы" },
   ];
 
   if (step === "upload") {

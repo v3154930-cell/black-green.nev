@@ -24,8 +24,8 @@ export const defaultMapping: ColumnMapping = {
   costPrice: "Цена",
   stock: "Остаток",
   imageSource: "Картинка",
-  category: "Категория",
-  unitType: "Тип",
+  categoryHint: "Категория",
+  typeHint: "Тип",
 };
 
 // Валидация одной строки
@@ -37,8 +37,8 @@ export function validateRow(row: CsvRow, mapping: ColumnMapping): ValidationResu
   const title = row[mapping.rawTitle || ""] || "";
   const priceStr = row[mapping.costPrice || ""] || "";
   const stockStr = row[mapping.stock || ""] || "0";
-  const category = row[mapping.category || ""] || "";
-  const unitType = row[mapping.unitType || ""] || "";
+  const category = row[mapping.categoryHint || ""] || "";
+  const unitType = row[mapping.typeHint || ""] || "";
 
   // Errors
   if (!sku.trim()) {
@@ -142,7 +142,7 @@ export const CORE_CATEGORIES: Record<string, string[]> = {
 // Определение eligibility для строки
 export function checkEligibility(row: RawImportRow): { result: EligibilityResult; reason?: RejectReason | ReviewReason } {
   const title = (row.rawTitle || "").toLowerCase();
-  const category = (row.data[row.mapping.category || ""] || "").toLowerCase();
+  const category = (row.data[row.mapping.categoryHint || ""] || "").toLowerCase();
   const sku = (row.supplierSku || "").
  toLowerCase();
 
