@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { adminModeration, supplierImports, importBatches, mockCsvData, mockCsvColumns, defaultMapping, applyMapping, applyEligibilityGate, getEligibilityStats } from "@/lib/data";
+import { adminModeration, supplierImports, importBatches, mockCsvData, mockCsvColumns, defaultMapping, applyMapping } from "@/lib/data";
 import { getDisplayPrice, getMargin, getUnitLabel, validatePrice } from "@/lib/pricing";
-import type { ModerationStatus, ModerationAction, ConfidenceLevel, SupplierImportItem, ColumnMapping, MappingField, EligibleImportRow, BatchEligibilityStats } from "@/lib/types";
+import type { ModerationStatus, ModerationAction, ConfidenceLevel, SupplierImportItem, ColumnMapping, MappingField, RawImportRow } from "@/lib/types";
 
 // Метки статусов
 const statusLabels: Record<ModerationStatus, string> = {
@@ -657,12 +657,11 @@ function ModerationCard({
 // ========================================
 
 export function FileIntakeSection() {
-  const [step, setStep] = useState<"upload" | "mapping" | "preview">("upload");
+  const [step, setStep] = useState<"upload" | "mapping" | "validation" | "preview">("upload");
   const [supplierName, setSupplierName] = useState("");
-  const [eligibleRows, setEligibleRows] = useState<EligibleImportRow[]>([]);
+  const [validatedRows, setValidatedRows] = useState<RawImportRow[]>([]);
   const [mapping, setMapping] = useState<ColumnMapping>(defaultMapping);
   const [columns, setColumns] = useState<string[]>([]);
-  const [stats, setStats] = useState<BatchEligibilityStats | null>(null);
 
   // Имитация загрузки файла
   const handleFileUpload = () => {
@@ -676,14 +675,15 @@ export function FileIntakeSection() {
     setMapping(prev => ({ ...prev, [field]: column || null }));
   };
 
-  // Применить маппинг и eligibility gate
+  // Применить маппинг и валидацию
   const applyCurrentMapping = () => {
     const mappedRows = applyMapping(mockCsvData, mapping);
-    // Применяем eligibility gate
-    const eligible = applyEligibilityGate(mappedRows);
-    const eligibilityStats = getEligibilityStats(eligible);
-    setEligibleRows(eligible);
-    setStats(eligibilityStats);
+    setValidatedRows(mappedRows);
+    setStep("validation");
+  };
+
+  // Перейти к preview (после просмотра ошибок валидации)
+  const goToPreview = () => {
     setStep("preview");
   };
 
@@ -840,117 +840,167 @@ export function FileIntakeSection() {
     );
   }
 
-  // Preview step - используем eligibility stats
+  // Validation step - показываем ошибки и предупреждения
+  if (step === "validation") {
+    const totalRows = validatedRows.length;
+    const rowsWithErrors = validatedRows.filter(r => r.validation.errors.length > 0).length;
+    const rowsWithWarnings = validatedRows.filter(r => r.validation.warnings.length > 0 && r.validation.errors.length === 0).length;
+    const validRows = validatedRows.filter(r => r.validation.isValid).length;
+
+    return (
+      <div className="space-y-6">
+        <div className="surface-subtle p-4 rounded-lg">
+          <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">
+            Проверка данных
+          </h3>
+          <p className="text-sm text-[var(--text-muted)]">
+            Результаты валидации после сопоставления колонок
+          </p>
+        </div>
+
+        {/* Stats */}
+        <div className="grid gap-3 sm:grid-cols-4">
+          <div className="surface-subtle p-3 rounded-lg">
+            <div className="text-xs text-[var(--text-muted)]">Всего строк</div>
+            <div className="text-xl font-semibold text-[var(--text-primary)]">{totalRows}</div>
+          </div>
+          <div className="surface-subtle p-3 rounded-lg border-2 border-green-500">
+            <div className="text-xs text-green-600">✓ Валидных</div>
+            <div className="text-xl font-semibold text-green-600">{validRows}</div>
+          </div>
+          <div className="surface-subtle p-3 rounded-lg border-2 border-amber-500">
+            <div className="text-xs text-amber-600">⚠ Предупреждения</div>
+            <div className="text-xl font-semibold text-amber-600">{rowsWithWarnings}</div>
+          </div>
+          <div className="surface-subtle p-3 rounded-lg border-2 border-red-500">
+            <div className="text-xs text-red-600">✕ Ошибки</div>
+            <div className="text-xl font-semibold text-red-600">{rowsWithErrors}</div>
+          </div>
+        </div>
+
+        {/* Validation details */}
+        <div className="surface-subtle p-4 rounded-lg">
+          <h4 className="text-sm font-medium text-[var(--text-primary)] mb-3">
+            Результаты по строкам
+          </h4>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[#e4e9e6]">
+                  <th className="px-2 py-2 text-left text-[var(--text-muted)] w-12">#</th>
+                  <th className="px-2 py-2 text-left text-[var(--text-muted)]">SKU</th>
+                  <th className="px-2 py-2 text-left text-[var(--text-muted)]">Название</th>
+                  <th className="px-2 py-2 text-left text-[var(--text-muted)]">Цена</th>
+                  <th className="px-2 py-2 text-left text-[var(--text-muted)]">Статус</th>
+                </tr>
+              </thead>
+              <tbody>
+                {validatedRows.map(row => (
+                  <tr key={row.rowIndex} className="border-b border-[#e4e9e6]">
+                    <td className="px-2 py-2 text-[var(--text-muted)]">{row.rowIndex}</td>
+                    <td className="px-2 py-2 text-[var(--text-primary)]">{row.supplierSku || '—'}</td>
+                    <td className="px-2 py-2 text-[var(--text-primary)]">{row.rawTitle || '—'}</td>
+                    <td className="px-2 py-2 text-[var(--text-secondary)]">{row.costPrice} ₽</td>
+                    <td className="px-2 py-2">
+                      {row.validation.errors.length > 0 ? (
+                        <span className="text-xs px-2 py-0.5 rounded bg-red-100 text-red-700">
+                          ✕ {row.validation.errors.length} ошибок
+                        </span>
+                      ) : row.validation.warnings.length > 0 ? (
+                        <span className="text-xs px-2 py-0.5 rounded bg-amber-100 text-amber-700">
+                          ⚠ {row.validation.warnings.length} предупреждений
+                        </span>
+                      ) : (
+                        <span className="text-xs px-2 py-0.5 rounded bg-green-100 text-green-700">
+                          ✓ OK
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Error details */}
+        {rowsWithErrors > 0 && (
+          <div className="surface-subtle p-4 rounded-lg">
+            <h4 className="text-sm font-medium text-[var(--text-primary)] mb-3">
+              Ошибки
+            </h4>
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              {validatedRows.filter(r => r.validation.errors.length > 0).map(row => (
+                <div key={row.rowIndex} className="text-sm p-2 bg-red-50 rounded">
+                  <span className="font-medium text-red-700">Строка {row.rowIndex}:</span>
+                  <ul className="mt-1 ml-4 text-red-600">
+                    {row.validation.errors.map((err, idx) => (
+                      <li key={idx}>• {err.message}</li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Warning details */}
+        {rowsWithWarnings > 0 && (
+          <div className="surface-subtle p-4 rounded-lg">
+            <h4 className="text-sm font-medium text-[var(--text-primary)] mb-3">
+              Предупреждения
+            </h4>
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              {validatedRows.filter(r => r.validation.warnings.length > 0 && r.validation.errors.length === 0).map(row => (
+                <div key={row.rowIndex} className="text-sm p-2 bg-amber-50 rounded">
+                  <span className="font-medium text-amber-700">Строка {row.rowIndex}:</span>
+                  <ul className="mt-1 ml-4 text-amber-600">
+                    {row.validation.warnings.map((warn, idx) => (
+                      <li key={idx}>• {warn.message}</li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="flex gap-3">
+          <button
+            onClick={() => setStep("mapping")}
+            className="px-4 py-2 border border-[#dfe5e1] rounded-lg text-[var(--text-primary)]"
+          >
+            Назад к маппингу
+          </button>
+          <button
+            onClick={goToPreview}
+            className="px-4 py-2 bg-brand-leaf text-white rounded-lg"
+          >
+            Продолжить
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Preview step - данные после валидации (без eligibility)
   return (
     <div className="space-y-6">
-      {/* Eligibility Stats - НОВЫЙ БЛОК */}
-      {stats && (
-        <div className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-4">
-            <div className="surface-subtle p-3 rounded-lg">
-              <div className="text-xs text-[var(--text-muted)]">Всего строк</div>
-              <div className="text-xl font-semibold text-[var(--text-primary)]">{stats.total}</div>
-            </div>
-            <div className="surface-subtle p-3 rounded-lg border-2 border-green-500">
-              <div className="text-xs text-green-600">✓ В ассортименте</div>
-              <div className="text-xl font-semibold text-green-600">{stats.pass}</div>
-            </div>
-            <div className="surface-subtle p-3 rounded-lg border-2 border-amber-500">
-              <div className="text-xs text-amber-600">⚠ На проверку</div>
-              <div className="text-xl font-semibold text-amber-600">{stats.softReview}</div>
-            </div>
-            <div className="surface-subtle p-3 rounded-lg border-2 border-red-500">
-              <div className="text-xs text-red-600">✕ Отклонено</div>
-              <div className="text-xl font-semibold text-red-600">{stats.hardReject}</div>
-            </div>
-          </div>
-
-          {/* Причины отклонения */}
-          {stats.hardReject > 0 && (
-            <div className="surface-subtle p-4 rounded-lg">
-              <h4 className="text-sm font-medium text-[var(--text-primary)] mb-2">
-                Причины отклонения
-              </h4>
-              <div className="flex flex-wrap gap-2">
-                {stats.rejectReasons.coffee > 0 && (
-                  <span className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded">
-                    ☕ Кофе: {stats.rejectReasons.coffee}
-                  </span>
-                )}
-                {stats.rejectReasons.mate > 0 && (
-                  <span className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded">
-                    🌿 Мате: {stats.rejectReasons.mate}
-                  </span>
-                )}
-                {stats.rejectReasons.packaging_no_core > 0 && (
-                  <span className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded">
-                    📦 Нецелевая упаковка: {stats.rejectReasons.packaging_no_core}
-                  </span>
-                )}
-                {stats.rejectReasons.outside_core_category > 0 && (
-                  <span className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded">
-                    🚫 Вне ассортимента: {stats.rejectReasons.outside_core_category}
-                  </span>
-                )}
-                {stats.rejectReasons.invalid_row > 0 && (
-                  <span className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded">
-                    ❌ Мусор: {stats.rejectReasons.invalid_row}
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Причины review */}
-          {stats.softReview > 0 && (
-            <div className="surface-subtle p-4 rounded-lg">
-              <h4 className="text-sm font-medium text-[var(--text-primary)] mb-2">
-                Причины проверки
-              </h4>
-              <div className="flex flex-wrap gap-2">
-                {stats.reviewReasons.unclear_category > 0 && (
-                  <span className="px-2 py-1 text-xs bg-amber-100 text-amber-700 rounded">
-                    ❓ Неясная категория: {stats.reviewReasons.unclear_category}
-                  </span>
-                )}
-                {stats.reviewReasons.ambiguous_type > 0 && (
-                  <span className="px-2 py-1 text-xs bg-amber-100 text-amber-700 rounded">
-                    🔀 Спорный тип: {stats.reviewReasons.ambiguous_type}
-                  </span>
-                )}
-                {stats.reviewReasons.low_confidence > 0 && (
-                  <span className="px-2 py-1 text-xs bg-amber-100 text-amber-700 rounded">
-                    📉 Низкая уверенность: {stats.reviewReasons.low_confidence}
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Rows table */}
       <div className="surface-subtle p-4 rounded-lg">
-        <div className="flex justify-between items-center mb-4">
-          <h4 className="text-sm font-medium text-[var(--text-primary)]">
-            Результат импорта
-          </h4>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setStep("mapping")}
-              className="px-3 py-1.5 text-sm border border-[#dfe5e1] rounded-lg"
-            >
-              Изменить маппинг
-            </button>
-            <button
-              onClick={() => alert(`Импортировано: ${stats?.pass} pass, ${stats?.softReview} на проверку`)}
-              className="px-3 py-1.5 text-sm bg-brand-leaf text-white rounded-lg"
-            >
-              Импортировать
-            </button>
-          </div>
-        </div>
+        <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">
+          Результат проверки
+        </h3>
+        <p className="text-sm text-[var(--text-muted)]">
+          Данные прошли валидацию. Перейдите к следующему шагу.
+        </p>
+      </div>
 
+      {/* Rows table - only validation status */}
+      <div className="surface-subtle p-4 rounded-lg">
+        <h4 className="text-sm font-medium text-[var(--text-primary)] mb-3">
+          Строки данных
+        </h4>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -964,7 +1014,7 @@ export function FileIntakeSection() {
               </tr>
             </thead>
             <tbody>
-              {eligibleRows.map(row => (
+              {validatedRows.map(row => (
                 <tr key={row.rowIndex} className="border-b border-[#e4e9e6]">
                   <td className="px-2 py-2 text-[var(--text-muted)]">{row.rowIndex}</td>
                   <td className="px-2 py-2 text-[var(--text-primary)]">{row.supplierSku || '—'}</td>
@@ -972,17 +1022,17 @@ export function FileIntakeSection() {
                   <td className="px-2 py-2 text-[var(--text-secondary)]">{row.costPrice} ₽</td>
                   <td className="px-2 py-2 text-[var(--text-secondary)]">{row.stock}</td>
                   <td className="px-2 py-2">
-                    {row.eligibility === "hard_reject" ? (
+                    {row.validation.errors.length > 0 ? (
                       <span className="text-xs px-2 py-0.5 rounded bg-red-100 text-red-700">
-                        ✕ Отклонено
+                        ✕ Ошибки
                       </span>
-                    ) : row.eligibility === "soft_review" ? (
+                    ) : row.validation.warnings.length > 0 ? (
                       <span className="text-xs px-2 py-0.5 rounded bg-amber-100 text-amber-700">
-                        ⚠ На проверку
+                        ⚠ Предупреждения
                       </span>
                     ) : (
                       <span className="text-xs px-2 py-0.5 rounded bg-green-100 text-green-700">
-                        ✓ В ассортименте
+                        ✓ OK
                       </span>
                     )}
                   </td>
@@ -991,50 +1041,22 @@ export function FileIntakeSection() {
             </tbody>
           </table>
         </div>
+      </div>
 
-        {/* Eligibility details */}
-        {eligibleRows.some(r => r.eligibility !== "pass") && (
-          <div className="mt-4 p-4 bg-[var(--bg-subtle)] rounded-lg">
-            <h5 className="text-sm font-medium text-[var(--text-primary)] mb-2">
-              Детали
-            </h5>
-            <div className="space-y-2 max-h-40 overflow-y-auto">
-              {eligibleRows.filter(r => r.eligibility !== "pass").map(row => (
-                <div key={row.rowIndex} className="text-xs">
-                  <span className="font-medium text-[var(--text-primary)]">Строка {row.rowIndex}:</span>
-                  {row.eligibility === "hard_reject" && row.rejectReason && (
-                    <div className="text-red-600 ml-2">
-                      ✕ Отклонено: {
-                        row.rejectReason === "coffee" ? "кофе" :
-                        row.rejectReason === "mate" ? "мате" :
-                        row.rejectReason === "packaging_no_core" ? "нецелевая упаковка" :
-                        row.rejectReason === "outside_core_category" ? "вне ассортимента" :
-                        row.rejectReason === "invalid_row" ? "мусорная строка" :
-                        "другое"
-                      }
-                    </div>
-                  )}
-                  {row.eligibility === "soft_review" && row.reviewReason && (
-                    <div className="text-amber-600 ml-2">
-                      ⚠ На проверке: {
-                        row.reviewReason === "unclear_category" ? "неясная категория" :
-                        row.reviewReason === "ambiguous_type" ? "спорный тип" :
-                        row.reviewReason === "low_confidence" ? "низкая уверенность" :
-                        "другое"
-                      }
-                    </div>
-                  )}
-                  {row.validation.errors.map((err, i) => (
-                    <div key={i} className="text-red-600 ml-2">❌ {err.message}</div>
-                  ))}
-                  {row.validation.warnings.map((warn, i) => (
-                    <div key={i} className="text-amber-600 ml-2">⚠️ {warn.message}</div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+      {/* Actions */}
+      <div className="flex gap-3">
+        <button
+          onClick={() => setStep("mapping")}
+          className="px-4 py-2 border border-[#dfe5e1] rounded-lg text-[var(--text-primary)]"
+        >
+          Назад к маппингу
+        </button>
+        <button
+          onClick={() => alert('Следующий шаг: eligibility gate (пока не реализовано)')}
+          className="px-4 py-2 bg-brand-leaf text-white rounded-lg"
+        >
+          Продолжить
+        </button>
       </div>
     </div>
   );
