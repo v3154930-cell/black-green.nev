@@ -657,10 +657,12 @@ function ModerationCard({
 // ========================================
 
 export function FileIntakeSection() {
-  const [step, setStep] = useState<"upload" | "mapping" | "validation" | "preview" | "eligibility">("upload");
+  const [step, setStep] = useState<"upload" | "mapping" | "validation" | "preview" | "eligibility" | "transform" | "moderationPreview">("upload");
   const [supplierName, setSupplierName] = useState("");
   const [validatedRows, setValidatedRows] = useState<RawImportRow[]>([]);
   const [eligibleRows, setEligibleRows] = useState<EligibleImportRow[]>([]);
+  const [transformedItems, setTransformedItems] = useState<SupplierImportItem[]>([]);
+  const [itemEligibilityStatus, setItemEligibilityStatus] = useState<Record<number, "pass" | "soft_review" | "blocked">>({});
   const [mapping, setMapping] = useState<ColumnMapping>(defaultMapping);
   const [columns, setColumns] = useState<string[]>([]);
 
@@ -693,6 +695,87 @@ export function FileIntakeSection() {
     const eligible = applyEligibilityGate(validatedRows);
     setEligibleRows(eligible);
     setStep("eligibility");
+  };
+
+  // Перейти к transform (только pass + soft_review БЕЗ validation errors)
+  const goToTransform = () => {
+    const transformed: SupplierImportItem[] = [];
+    const statusMap: Record<number, "pass" | "soft_review" | "blocked"> = {};
+
+    eligibleRows
+      .filter(row => row.eligibility === "pass" || row.eligibility === "soft_review")
+      .forEach(row => {
+        const hasErrors = row.validation.errors.length > 0;
+        
+        const categoryHintCol = row.mapping.categoryHint;
+        const typeHintCol = row.mapping.typeHint;
+        
+        const categoryRaw = categoryHintCol ? (row.data[categoryHintCol] || "") : "";
+        const typeRaw = typeHintCol ? (row.data[typeHintCol] || "") : "";
+        
+        const categoryLower = categoryRaw.toLowerCase();
+        const typeLower = typeRaw.toLowerCase();
+        const titleLower = (row.rawTitle || "").toLowerCase();
+        
+        let suggestedCategory: "tea" | "teaware" | "tea-drinks" | "gifts" = "tea";
+        let unitType: "weight" | "pack" | "piece" = "weight";
+        
+        if (typeLower.includes("gaiwan") || typeLower.includes("teapot") || typeLower.includes("чайник") || 
+            typeLower.includes("чашка") || typeLower.includes("cup") || typeLower.includes("посуд") ||
+            categoryLower.includes("посуд") || titleLower.includes("gaiwan") || titleLower.includes("гайван") ||
+            titleLower.includes("чайник") || titleLower.includes("чашка") || titleLower.includes("заварушка")) {
+          suggestedCategory = "teaware";
+          unitType = "piece";
+        } else if (typeLower.includes("gift") || typeLower.includes("подар") || categoryLower.includes("подар")) {
+          suggestedCategory = "gifts";
+          unitType = "piece";
+        } else if (typeLower.includes("напиток") || typeLower.includes("настой") || categoryLower.includes("напиток")) {
+          suggestedCategory = "tea-drinks";
+          unitType = "pack";
+        } else {
+          suggestedCategory = "tea";
+          if (typeLower.includes("упаковк") || typeLower.includes("pack") || typeLower.includes("коробк")) {
+            unitType = "pack";
+          } else {
+            unitType = "weight";
+          }
+        }
+
+        const item: SupplierImportItem = {
+          supplierName: supplierName || "Unknown",
+          supplierSku: row.supplierSku || "",
+          rawTitle: row.rawTitle || "",
+          normalizedTitle: row.rawTitle || "",
+          suggestedCategory,
+          suggestedType: suggestedCategory === "teaware" ? "teaware" : suggestedCategory === "gifts" ? "gift" : "tea",
+          unitType,
+          costPrice: row.costPrice || 0,
+          stock: row.stock || 0,
+          stockStatus: (row.stock && row.stock > 0) ? "in-stock" : "out-of-stock",
+          imageSource: row.imageSource || "",
+          confidence: row.validation.isValid ? 0.8 : 0.5,
+          confidenceLevel: row.validation.isValid ? "high" : "medium",
+          warnings: row.validation.warnings.map(w => w.message),
+          notes: [],
+          decisionNotes: [],
+          duplicationHints: [],
+          importedAt: new Date().toISOString(),
+          importBatchId: "",
+        };
+
+        transformed.push(item);
+        const newIdx = transformed.length - 1;
+        statusMap[newIdx] = hasErrors ? "blocked" : (row.eligibility as "pass" | "soft_review");
+      });
+
+    setTransformedItems(transformed);
+    setItemEligibilityStatus(statusMap);
+    setStep("transform");
+  };
+
+  // Перейти к preview модерации
+  const goToModerationPreview = () => {
+    setStep("moderationPreview");
   };
 
   // Название полей маппинга
@@ -997,7 +1080,31 @@ export function FileIntakeSection() {
     return (
       <EligibilityStep 
         rows={eligibleRows} 
-        onBack={() => setStep("preview")} 
+        onBack={() => setStep("preview")}
+        onTransform={goToTransform}
+      />
+    );
+  }
+
+  // Transform step - преобразование в SupplierImportItem
+  if (step === "transform") {
+    return (
+      <TransformStep 
+        items={transformedItems}
+        eligibilityStatus={itemEligibilityStatus}
+        onBack={() => setStep("eligibility")}
+        onContinue={goToModerationPreview}
+      />
+    );
+  }
+
+  // Moderation Preview step - предпросмотр перед передачей в модерацию
+  if (step === "moderationPreview") {
+    return (
+      <ModerationPreviewStep 
+        items={transformedItems}
+        eligibilityStatus={itemEligibilityStatus}
+        onBack={() => setStep("transform")}
       />
     );
   }
@@ -1109,10 +1216,12 @@ const eligibilityLabels: Record<EligibilityResult, string> = {
 
 function EligibilityStep({ 
   rows, 
-  onBack 
+  onBack,
+  onTransform 
 }: { 
   rows: EligibleImportRow[]; 
   onBack: () => void;
+  onTransform: () => void;
 }) {
   const stats = getEligibilityStats(rows);
 
@@ -1240,10 +1349,233 @@ function EligibilityStep({
           Назад
         </button>
         <button
-          onClick={() => alert('Готово! (Импорт в каталог - следующий этап)')}
+          onClick={onTransform}
           className="px-4 py-2 bg-brand-leaf text-white rounded-lg"
         >
           Продолжить
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function TransformStep({ 
+  items, 
+  eligibilityStatus,
+  onBack,
+  onContinue 
+}: { 
+  items: SupplierImportItem[]; 
+  eligibilityStatus: Record<number, "pass" | "soft_review" | "blocked">;
+  onBack: () => void;
+  onContinue: () => void;
+}) {
+  const passCount = items.filter((_, idx) => eligibilityStatus[idx] === "pass").length;
+  const reviewCount = items.filter((_, idx) => eligibilityStatus[idx] === "soft_review").length;
+  const blockedCount = items.filter((_, idx) => eligibilityStatus[idx] === "blocked").length;
+
+  return (
+    <div className="space-y-6">
+      <div className="surface-subtle p-4 rounded-lg">
+        <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">
+          Преобразование в карточки товаров
+        </h3>
+        <p className="text-sm text-[var(--text-muted)]">
+          Результат преобразования строк в формат импорта
+        </p>
+      </div>
+
+      {/* Stats */}
+      <div className="grid gap-3 sm:grid-cols-4">
+        <div className="surface-subtle p-3 rounded-lg">
+          <div className="text-xs text-[var(--text-muted)]">Всего</div>
+          <div className="text-xl font-semibold text-[var(--text-primary)]">{items.length}</div>
+        </div>
+        <div className="surface-subtle p-3 rounded-lg border-2 border-green-500">
+          <div className="text-xs text-green-600">Готовы</div>
+          <div className="text-xl font-semibold text-green-600">{passCount}</div>
+        </div>
+        <div className="surface-subtle p-3 rounded-lg border-2 border-amber-500">
+          <div className="text-xs text-amber-600">На проверку</div>
+          <div className="text-xl font-semibold text-amber-600">{reviewCount}</div>
+        </div>
+        <div className="surface-subtle p-3 rounded-lg border-2 border-red-500">
+          <div className="text-xs text-red-600">Заблокировано</div>
+          <div className="text-xl font-semibold text-red-600">{blockedCount}</div>
+        </div>
+      </div>
+
+      {/* Preview items table */}
+      <div className="surface-subtle p-4 rounded-lg">
+        <h4 className="text-sm font-medium text-[var(--text-primary)] mb-3">
+          Карточки товаров
+        </h4>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-[#e4e9e6]">
+                <th className="px-2 py-2 text-left text-[var(--text-muted)]">SKU</th>
+                <th className="px-2 py-2 text-left text-[var(--text-muted)]">Название</th>
+                <th className="px-2 py-2 text-left text-[var(--text-muted)]">Категория</th>
+                <th className="px-2 py-2 text-left text-[var(--text-muted)]">Тип</th>
+                <th className="px-2 py-2 text-left text-[var(--text-muted)]">Цена</th>
+                <th className="px-2 py-2 text-left text-[var(--text-muted)]">Статус</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item, idx) => {
+                const status = eligibilityStatus[idx];
+                const isBlocked = status === "blocked";
+                const isReview = status === "soft_review";
+                return (
+                <tr key={idx} className={`border-b border-[#e4e9e6] ${isBlocked ? 'bg-red-50' : ''}`}>
+                  <td className="px-2 py-2 text-[var(--text-primary)]">{item.supplierSku}</td>
+                  <td className="px-2 py-2 text-[var(--text-primary)]">{item.normalizedTitle}</td>
+                  <td className="px-2 py-2 text-[var(--text-secondary)]">{item.suggestedCategory}</td>
+                  <td className="px-2 py-2 text-[var(--text-secondary)]">{item.unitType}</td>
+                  <td className="px-2 py-2 text-[var(--text-secondary)]">{item.costPrice} ₽</td>
+                  <td className="px-2 py-2">
+                    {isBlocked ? (
+                      <span className="text-xs px-2 py-0.5 rounded bg-red-100 text-red-700">
+                        ✕ Заблокировано
+                      </span>
+                    ) : isReview ? (
+                      <span className="text-xs px-2 py-0.5 rounded bg-amber-100 text-amber-700">
+                        ⚠ На проверку
+                      </span>
+                    ) : (
+                      <span className="text-xs px-2 py-0.5 rounded bg-green-100 text-green-700">
+                        ✓ Готов
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex gap-3">
+        <button
+          onClick={onBack}
+          className="px-4 py-2 border border-[#dfe5e1] rounded-lg text-[var(--text-primary)]"
+        >
+          Назад
+        </button>
+        <button
+          onClick={onContinue}
+          className="px-4 py-2 bg-brand-leaf text-white rounded-lg"
+        >
+          Продолжить
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ModerationPreviewStep({ 
+  items, 
+  eligibilityStatus,
+  onBack 
+}: { 
+  items: SupplierImportItem[]; 
+  eligibilityStatus: Record<number, "pass" | "soft_review" | "blocked">;
+  onBack: () => void;
+}) {
+  const readyCount = items.filter((_, idx) => eligibilityStatus[idx] === "pass").length;
+  const reviewCount = items.filter((_, idx) => eligibilityStatus[idx] === "soft_review").length;
+  const blockedCount = items.filter((_, idx) => eligibilityStatus[idx] === "blocked").length;
+
+  const handleTransfer = () => {
+    alert('Заглушка: передача в модерацию\n\nВ реальном приложении здесь будет:\n- Создание карточек модерации\n- Передача в систему модерации\n- Обновление статусов');
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="surface-subtle p-4 rounded-lg">
+        <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">
+          Передача в модерацию
+        </h3>
+        <p className="text-sm text-[var(--text-muted)]">
+          Предпросмотр товаров перед передачей на модерацию
+        </p>
+      </div>
+
+      {/* Stats */}
+      <div className="grid gap-3 sm:grid-cols-4">
+        <div className="surface-subtle p-3 rounded-lg">
+          <div className="text-xs text-[var(--text-muted)]">Всего</div>
+          <div className="text-xl font-semibold text-[var(--text-primary)]">{items.length}</div>
+        </div>
+        <div className="surface-subtle p-3 rounded-lg border-2 border-green-500">
+          <div className="text-xs text-green-600">Готово</div>
+          <div className="text-xl font-semibold text-green-600">{readyCount}</div>
+        </div>
+        <div className="surface-subtle p-3 rounded-lg border-2 border-amber-500">
+          <div className="text-xs text-amber-600">На проверку</div>
+          <div className="text-xl font-semibold text-amber-600">{reviewCount}</div>
+        </div>
+        <div className="surface-subtle p-3 rounded-lg border-2 border-red-500">
+          <div className="text-xs text-red-600">Заблокировано</div>
+          <div className="text-xl font-semibold text-red-600">{blockedCount}</div>
+        </div>
+      </div>
+
+      {/* Preview cards */}
+      <div className="surface-subtle p-4 rounded-lg">
+        <h4 className="text-sm font-medium text-[var(--text-primary)] mb-3">
+          Карточки для модерации
+        </h4>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {items.map((item, idx) => {
+            const status = eligibilityStatus[idx];
+            const isBlocked = status === "blocked";
+            const needsReview = status === "soft_review";
+            return (
+              <div key={idx} className={`card-surface p-4 space-y-2 ${isBlocked ? 'opacity-60' : ''}`}>
+                <div className="flex items-center justify-between">
+                  <span className={`text-xs px-2 py-0.5 rounded ${
+                    isBlocked 
+                      ? "bg-red-100 text-red-700"
+                      : needsReview 
+                        ? "bg-amber-100 text-amber-700" 
+                        : "bg-green-100 text-green-700"
+                  }`}>
+                    {isBlocked ? "✕ Заблокировано" : needsReview ? "⚠ Требует проверки" : "✓ Готово"}
+                  </span>
+                  <span className="text-xs text-[var(--text-muted)]">{item.supplierSku}</span>
+                </div>
+                <div className="text-sm font-medium text-[var(--text-primary)]">
+                  {item.normalizedTitle}
+                </div>
+                <div className="text-xs text-[var(--text-secondary)] space-y-0.5">
+                  <div>Категория: {item.suggestedCategory}</div>
+                  <div>Тип: {item.unitType}</div>
+                  <div>Цена: {item.costPrice} ₽</div>
+                  <div>Остаток: {item.stock > 0 ? `${item.stock} шт` : "Нет"}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex gap-3">
+        <button
+          onClick={onBack}
+          className="px-4 py-2 border border-[#dfe5e1] rounded-lg text-[var(--text-primary)]"
+        >
+          Назад
+        </button>
+        <button
+          onClick={handleTransfer}
+          className="px-4 py-2 bg-brand-leaf text-white rounded-lg"
+        >
+          Передать в модерацию
         </button>
       </div>
     </div>
