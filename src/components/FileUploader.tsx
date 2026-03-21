@@ -1,6 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import type { ColumnMapping } from "@/lib/types";
+
+// Метки полей для маппинга
+const mappingFieldLabels: Record<keyof ColumnMapping, string> = {
+  supplierSku: "Артикул поставщика (SKU)",
+  rawTitle: "Название товара",
+  costPrice: "Себестоимость",
+  stock: "Остаток",
+  imageSource: "Изображение",
+  categoryHint: "Категория",
+  typeHint: "Тип товара",
+};
 
 interface CsvParseResult {
   columns: string[];
@@ -51,6 +63,15 @@ export function FileUploader() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [parseResult, setParseResult] = useState<CsvParseResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [columnMapping, setColumnMapping] = useState<ColumnMapping>({
+    supplierSku: null,
+    rawTitle: null,
+    costPrice: null,
+    stock: null,
+    imageSource: null,
+    categoryHint: null,
+    typeHint: null,
+  });
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -87,7 +108,28 @@ export function FileUploader() {
   const handleReset = () => {
     setSelectedFile(null);
     setParseResult(null);
+    setColumnMapping({
+      supplierSku: null,
+      rawTitle: null,
+      costPrice: null,
+      stock: null,
+      imageSource: null,
+      categoryHint: null,
+      typeHint: null,
+    });
   };
+
+  // Обработчик изменения маппинга
+  const handleMappingChange = (field: keyof ColumnMapping, csvColumn: string | null) => {
+    setColumnMapping(prev => ({
+      ...prev,
+      [field]: csvColumn,
+    }));
+  };
+
+  // Подсчёт количества сопоставленных полей
+  const mappedCount = Object.values(columnMapping).filter(v => v !== null).length;
+  const totalFields = Object.keys(columnMapping).length;
 
   // Show file info + preview
   if (selectedFile && parseResult) {
@@ -182,6 +224,41 @@ export function FileUploader() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              </div>
+            )}
+
+            {/* Column Mapping Block */}
+            {parseResult.columns.length > 0 && (
+              <div className="surface-subtle p-4 rounded-lg">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-medium text-[var(--text-primary)]">
+                    Сопоставление колонок
+                  </h4>
+                  <span className="text-xs text-[var(--text-muted)]">
+                    {mappedCount} / {totalFields} полей
+                  </span>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {(Object.keys(mappingFieldLabels) as Array<keyof ColumnMapping>).map((field) => (
+                    <div key={field} className="flex items-center gap-2">
+                      <label className="text-xs text-[var(--text-secondary)] w-28 shrink-0">
+                        {mappingFieldLabels[field]}
+                      </label>
+                      <select
+                        value={columnMapping[field] || ""}
+                        onChange={(e) => handleMappingChange(field, e.target.value || null)}
+                        className="flex-1 px-2 py-1.5 text-xs border border-[#dfe5e1] rounded-lg bg-white text-[var(--text-primary)]"
+                      >
+                        <option value="">— Не выбрано —</option>
+                        {parseResult.columns.map((col) => (
+                          <option key={col} value={col}>
+                            {col}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}

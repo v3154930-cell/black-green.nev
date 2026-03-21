@@ -262,13 +262,13 @@ export type CsvRow = Record<string, string>;
 
 // Предложенные маппинги колонок
 export type ColumnMapping = {
-  supplierSku: string | null;
-  rawTitle: string | null;
-  costPrice: string | null;
-  stock: string | null;
-  imageSource: string | null;
-  category: string | null;
-  unitType: string | null;
+  supplierSku: string | null;  // Артикул поставщика / vendorCode
+  rawTitle: string | null;     // Название товара / title
+  costPrice: string | null;    // Себестоимость
+  stock: string | null;        // Остаток
+  imageSource: string | null;  // Ссылка на изображение
+  categoryHint: string | null; // Подсказка по категории
+  typeHint: string | null;     // Подсказка по типу (чай, посуда, подарки)
 };
 
 // Доступные поля для маппинга
