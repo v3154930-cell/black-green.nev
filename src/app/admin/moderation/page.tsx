@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { adminModeration, supplierImports, importBatches, mockCsvData, mockCsvColumns, defaultMapping, applyMapping } from "@/lib/data";
+import { adminModeration, supplierImports, importBatches, mockCsvData, mockCsvColumns, defaultMapping, applyMapping, applyEligibilityGate, getEligibilityStats } from "@/lib/data";
 import { getDisplayPrice, getMargin, getUnitLabel, validatePrice } from "@/lib/pricing";
-import type { ModerationStatus, ModerationAction, ConfidenceLevel, SupplierImportItem, ColumnMapping, MappingField, RawImportRow } from "@/lib/types";
+import type { ModerationStatus, ModerationAction, ConfidenceLevel, SupplierImportItem, ColumnMapping, MappingField, RawImportRow, EligibleImportRow, EligibilityResult, RejectReason, ReviewReason } from "@/lib/types";
 
 // Метки статусов
 const statusLabels: Record<ModerationStatus, string> = {
@@ -657,9 +657,10 @@ function ModerationCard({
 // ========================================
 
 export function FileIntakeSection() {
-  const [step, setStep] = useState<"upload" | "mapping" | "validation" | "preview">("upload");
+  const [step, setStep] = useState<"upload" | "mapping" | "validation" | "preview" | "eligibility">("upload");
   const [supplierName, setSupplierName] = useState("");
   const [validatedRows, setValidatedRows] = useState<RawImportRow[]>([]);
+  const [eligibleRows, setEligibleRows] = useState<EligibleImportRow[]>([]);
   const [mapping, setMapping] = useState<ColumnMapping>(defaultMapping);
   const [columns, setColumns] = useState<string[]>([]);
 
@@ -685,6 +686,13 @@ export function FileIntakeSection() {
   // Перейти к preview (после просмотра ошибок валидации)
   const goToPreview = () => {
     setStep("preview");
+  };
+
+  // Перейти к eligibility (после preview)
+  const goToEligibility = () => {
+    const eligible = applyEligibilityGate(validatedRows);
+    setEligibleRows(eligible);
+    setStep("eligibility");
   };
 
   // Название полей маппинга
@@ -984,7 +992,17 @@ export function FileIntakeSection() {
     );
   }
 
-  // Preview step - данные после валидации (без eligibility)
+  // Eligibility step - проверка допустимости товаров
+  if (step === "eligibility") {
+    return (
+      <EligibilityStep 
+        rows={eligibleRows} 
+        onBack={() => setStep("preview")} 
+      />
+    );
+  }
+
+  // Preview step - данные после валидации
   return (
     <div className="space-y-6">
       <div className="surface-subtle p-4 rounded-lg">
@@ -1046,13 +1064,183 @@ export function FileIntakeSection() {
       {/* Actions */}
       <div className="flex gap-3">
         <button
-          onClick={() => setStep("mapping")}
+          onClick={() => setStep("validation")}
           className="px-4 py-2 border border-[#dfe5e1] rounded-lg text-[var(--text-primary)]"
         >
-          Назад к маппингу
+          Назад
         </button>
         <button
-          onClick={() => alert('Следующий шаг: eligibility gate (пока не реализовано)')}
+          onClick={goToEligibility}
+          className="px-4 py-2 bg-brand-leaf text-white rounded-lg"
+        >
+          Продолжить
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const rejectReasonLabels: Record<RejectReason, string> = {
+  coffee: "Кофе",
+  mate: "Мате",
+  packaging_no_core: "Нецелевая упаковка",
+  outside_core_category: "Не в ассортименте",
+  invalid_row: "Пустая/тестовая строка",
+  ambiguous: "Неоднозначный товар",
+};
+
+const reviewReasonLabels: Record<ReviewReason, string> = {
+  unclear_category: "Неочевидная категория",
+  ambiguous_type: "Спорный тип товара",
+  low_confidence: "Низкая уверенность",
+};
+
+const eligibilityColors: Record<EligibilityResult, string> = {
+  pass: "bg-green-100 text-green-700",
+  soft_review: "bg-amber-100 text-amber-700",
+  hard_reject: "bg-red-100 text-red-700",
+};
+
+const eligibilityLabels: Record<EligibilityResult, string> = {
+  pass: "✓ Прошли",
+  soft_review: "⚠ На проверку",
+  hard_reject: "✕ Отклонены",
+};
+
+function EligibilityStep({ 
+  rows, 
+  onBack 
+}: { 
+  rows: EligibleImportRow[]; 
+  onBack: () => void;
+}) {
+  const stats = getEligibilityStats(rows);
+
+  const hasRejections = stats.hardReject > 0;
+  const hasReviews = stats.softReview > 0;
+
+  return (
+    <div className="space-y-6">
+      <div className="surface-subtle p-4 rounded-lg">
+        <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">
+          Проверка допустимости
+        </h3>
+        <p className="text-sm text-[var(--text-muted)]">
+          Определение товаров для импорта в каталог
+        </p>
+      </div>
+
+      {/* Stats */}
+      <div className="grid gap-3 sm:grid-cols-4">
+        <div className="surface-subtle p-3 rounded-lg">
+          <div className="text-xs text-[var(--text-muted)]">Всего строк</div>
+          <div className="text-xl font-semibold text-[var(--text-primary)]">{stats.total}</div>
+        </div>
+        <div className="surface-subtle p-3 rounded-lg border-2 border-green-500">
+          <div className="text-xs text-green-600">✓ Прошли</div>
+          <div className="text-xl font-semibold text-green-600">{stats.pass}</div>
+        </div>
+        <div className="surface-subtle p-3 rounded-lg border-2 border-amber-500">
+          <div className="text-xs text-amber-600">⚠ На проверку</div>
+          <div className="text-xl font-semibold text-amber-600">{stats.softReview}</div>
+        </div>
+        <div className="surface-subtle p-3 rounded-lg border-2 border-red-500">
+          <div className="text-xs text-red-600">✕ Отклонены</div>
+          <div className="text-xl font-semibold text-red-600">{stats.hardReject}</div>
+        </div>
+      </div>
+
+      {/* Reject reasons */}
+      {hasRejections && (
+        <div className="surface-subtle p-4 rounded-lg">
+          <h4 className="text-sm font-medium text-[var(--text-primary)] mb-3">
+            Причины отклонения
+          </h4>
+          <div className="flex flex-wrap gap-2">
+            {(Object.entries(stats.rejectReasons) as [RejectReason, number][]).map(([reason, count]) => (
+              count > 0 && (
+                <span key={reason} className="text-xs px-2 py-1 bg-red-50 text-red-700 rounded">
+                  {rejectReasonLabels[reason]}: {count}
+                </span>
+              )
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Review reasons */}
+      {hasReviews && (
+        <div className="surface-subtle p-4 rounded-lg">
+          <h4 className="text-sm font-medium text-[var(--text-primary)] mb-3">
+            Причины проверки
+          </h4>
+          <div className="flex flex-wrap gap-2">
+            {(Object.entries(stats.reviewReasons) as [ReviewReason, number][]).map(([reason, count]) => (
+              count > 0 && (
+                <span key={reason} className="text-xs px-2 py-1 bg-amber-50 text-amber-700 rounded">
+                  {reviewReasonLabels[reason]}: {count}
+                </span>
+              )
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Rows table */}
+      <div className="surface-subtle p-4 rounded-lg">
+        <h4 className="text-sm font-medium text-[var(--text-primary)] mb-3">
+          Строки данных
+        </h4>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-[#e4e9e6]">
+                <th className="px-2 py-2 text-left text-[var(--text-muted)] w-12">#</th>
+                <th className="px-2 py-2 text-left text-[var(--text-muted)]">SKU</th>
+                <th className="px-2 py-2 text-left text-[var(--text-muted)]">Название</th>
+                <th className="px-2 py-2 text-left text-[var(--text-muted)]">Цена</th>
+                <th className="px-2 py-2 text-left text-[var(--text-muted)]">Статус</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(row => (
+                <tr key={row.rowIndex} className="border-b border-[#e4e9e6]">
+                  <td className="px-2 py-2 text-[var(--text-muted)]">{row.rowIndex}</td>
+                  <td className="px-2 py-2 text-[var(--text-primary)]">{row.supplierSku || '—'}</td>
+                  <td className="px-2 py-2 text-[var(--text-primary)]">{row.rawTitle || '—'}</td>
+                  <td className="px-2 py-2 text-[var(--text-secondary)]">{row.costPrice} ₽</td>
+                  <td className="px-2 py-2">
+                    <span className={`text-xs px-2 py-0.5 rounded ${eligibilityColors[row.eligibility]}`}>
+                      {eligibilityLabels[row.eligibility]}
+                    </span>
+                    {row.eligibility === "hard_reject" && row.rejectReason && (
+                      <span className="text-xs text-red-600 ml-1">
+                        ({rejectReasonLabels[row.rejectReason]})
+                      </span>
+                    )}
+                    {row.eligibility === "soft_review" && row.reviewReason && (
+                      <span className="text-xs text-amber-600 ml-1">
+                        ({reviewReasonLabels[row.reviewReason]})
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex gap-3">
+        <button
+          onClick={onBack}
+          className="px-4 py-2 border border-[#dfe5e1] rounded-lg text-[var(--text-primary)]"
+        >
+          Назад
+        </button>
+        <button
+          onClick={() => alert('Готово! (Импорт в каталог - следующий этап)')}
           className="px-4 py-2 bg-brand-leaf text-white rounded-lg"
         >
           Продолжить
