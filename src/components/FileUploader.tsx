@@ -230,36 +230,105 @@ export function FileUploader() {
 
             {/* Column Mapping Block */}
             {parseResult.columns.length > 0 && (
-              <div className="surface-subtle p-4 rounded-lg">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-sm font-medium text-[var(--text-primary)]">
-                    Сопоставление колонок
-                  </h4>
-                  <span className="text-xs text-[var(--text-muted)]">
-                    {mappedCount} / {totalFields} полей
-                  </span>
+              <div className="space-y-4">
+                <div className="surface-subtle p-4 rounded-lg">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-sm font-medium text-[var(--text-primary)]">
+                      Сопоставление колонок
+                    </h4>
+                    <span className="text-xs text-[var(--text-muted)]">
+                      {mappedCount} / {totalFields} полей
+                    </span>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {(Object.keys(mappingFieldLabels) as Array<keyof ColumnMapping>).map((field) => (
+                      <div key={field} className="flex items-center gap-2">
+                        <label className="text-xs text-[var(--text-secondary)] w-28 shrink-0">
+                          {mappingFieldLabels[field]}
+                        </label>
+                        <select
+                          value={columnMapping[field] || ""}
+                          onChange={(e) => handleMappingChange(field, e.target.value || null)}
+                          className="flex-1 px-2 py-1.5 text-xs border border-[#dfe5e1] rounded-lg bg-white text-[var(--text-primary)]"
+                        >
+                          <option value="">— Не выбрано —</option>
+                          {parseResult.columns.map((col) => (
+                            <option key={col} value={col}>
+                              {col}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {(Object.keys(mappingFieldLabels) as Array<keyof ColumnMapping>).map((field) => (
-                    <div key={field} className="flex items-center gap-2">
-                      <label className="text-xs text-[var(--text-secondary)] w-28 shrink-0">
-                        {mappingFieldLabels[field]}
-                      </label>
-                      <select
-                        value={columnMapping[field] || ""}
-                        onChange={(e) => handleMappingChange(field, e.target.value || null)}
-                        className="flex-1 px-2 py-1.5 text-xs border border-[#dfe5e1] rounded-lg bg-white text-[var(--text-primary)]"
-                      >
-                        <option value="">— Не выбрано —</option>
-                        {parseResult.columns.map((col) => (
-                          <option key={col} value={col}>
-                            {col}
-                          </option>
-                        ))}
-                      </select>
+
+                {/* Mapped Data Preview */}
+                {mappedCount > 0 && parseResult.rows.length > 0 && (
+                  <div className="surface-subtle p-4 rounded-lg">
+                    <h4 className="text-sm font-medium text-[var(--text-primary)] mb-3">
+                      Предпросмотр данных после маппинга
+                    </h4>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="border-b border-[#e4e9e6]">
+                            <th className="px-2 py-1.5 text-left text-[var(--text-muted)] font-medium">#</th>
+                            {(Object.keys(mappingFieldLabels) as Array<keyof ColumnMapping>).map((field) => (
+                              <th 
+                                key={field} 
+                                className={`px-2 py-1.5 text-left font-medium ${
+                                  columnMapping[field] 
+                                    ? "text-brand-leaf bg-brand-leaf/5" 
+                                    : "text-[var(--text-muted)]"
+                                }`}
+                              >
+                                {mappingFieldLabels[field]}
+                                {columnMapping[field] && (
+                                  <span className="ml-1 text-[10px] opacity-70">
+                                    ← {columnMapping[field]}
+                                  </span>
+                                )}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {parseResult.rows.map((row, rowIdx) => (
+                            <tr key={rowIdx} className="border-b border-[#e4e9e6]">
+                              <td className="px-2 py-1.5 text-[var(--text-muted)]">{rowIdx + 1}</td>
+                              {(Object.keys(mappingFieldLabels) as Array<keyof ColumnMapping>).map((field) => {
+                                const mappedCol = columnMapping[field];
+                                const value = mappedCol ? row[parseResult.columns.indexOf(mappedCol)] : null;
+                                const isEmpty = !value || value.trim() === "";
+                                return (
+                                  <td 
+                                    key={field} 
+                                    className={`px-2 py-1.5 max-w-[150px] truncate ${
+                                      columnMapping[field]
+                                        ? isEmpty
+                                          ? "text-red-500 bg-red-50/50"
+                                          : "text-[var(--text-primary)]"
+                                        : "text-[var(--text-muted)] italic"
+                                    }`}
+                                  >
+                                    {columnMapping[field] 
+                                      ? (isEmpty ? "— пусто —" : value)
+                                      : "—"
+                                    }
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                  ))}
-                </div>
+                    <div className="mt-2 text-xs text-[var(--text-muted)]">
+                      Красным выделены поля с пустыми значениями после маппинга
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </>
