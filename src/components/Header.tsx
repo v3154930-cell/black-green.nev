@@ -33,9 +33,6 @@ export function Header() {
           height={32}
           className="h-8 w-auto"
         />
-        <div className="hidden sm:block">
-          <div className="text-sm text-white/70 leading-tight">Современный чайный магазин</div>
-        </div>
       </div>
       <nav className="flex flex-wrap gap-4 text-sm sm:text-base">
         {navItems.map((item) => (
