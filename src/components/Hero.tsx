@@ -1,15 +1,32 @@
 import { getTimeOfDay, heroScenes } from "@/lib/time-of-day";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import Image from "next/image";
 import { FallbackImage } from "./FallbackImage";
 
 type HeroProps = {
   highlightImage?: string;
 };
 
-export function Hero({ highlightImage = "/images/hero-tea.jpg" }: HeroProps) {
+const heroImages = {
+  morning: "/images/hero/01-hero-morning.png",
+  day: "/images/hero/02-hero-day.png",
+  evening: "/images/hero/03-hero-evening.png",
+  night: "/images/hero/04-hero-night.png",
+};
+
+const timeIcons = {
+  morning: "/images/icons/time-of-day/01-morning.png",
+  day: "/images/icons/time-of-day/02-day.png",
+  evening: "/images/icons/time-of-day/03-evening.png",
+  night: "/images/icons/time-of-day/04-night.png",
+};
+
+export function Hero({ highlightImage }: HeroProps) {
   const timeOfDay = getTimeOfDay();
   const hero = heroScenes[timeOfDay];
+  const heroImage = heroImages[timeOfDay];
+  const timeIcon = timeIcons[timeOfDay];
 
   return (
     <section
@@ -43,14 +60,20 @@ export function Hero({ highlightImage = "/images/hero-tea.jpg" }: HeroProps) {
               href="/news"
               className="inline-flex items-center gap-2 rounded-xl border border-[#dfe5e1] bg-white px-4 py-2 text-[var(--text-primary)] hover:border-brand-leaf"
             >
-              Журнал
+              Чайные новости
             </Link>
           </div>
         </div>
         <div className="surface-subtle p-4 sm:p-5 lg:w-96 space-y-3">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-[var(--bg-card)] border border-[#dfe5e1] flex items-center justify-center text-brand-leaf font-semibold">
-              {timeOfDay === "morning" ? "AM" : timeOfDay === "day" ? "PM" : timeOfDay === "evening" ? "EV" : "NT"}
+            <div className="h-10 w-10 rounded-full overflow-hidden bg-[var(--bg-card)] border border-[#dfe5e1] flex items-center justify-center shrink-0">
+              <Image
+                src={timeIcon}
+                alt=""
+                width={40}
+                height={40}
+                className="h-full w-full object-cover scale-[1.35] -translate-x-1.5"
+              />
             </div>
             <div>
               <div className="text-sm text-[var(--text-muted)]">Режим времени суток</div>
@@ -61,7 +84,7 @@ export function Hero({ highlightImage = "/images/hero-tea.jpg" }: HeroProps) {
             Hero обновляется под время суток: утро, день, вечер, ночь. Витрина остаётся спокойной и чистой.
           </p>
           <div className="relative h-40 w-full bg-[var(--bg-subtle)] rounded-lg overflow-hidden">
-            <FallbackImage src={highlightImage} alt="Hero highlight" fill className="object-cover" />
+            <FallbackImage src={heroImage} alt="Hero highlight" fill className="object-cover" />
           </div>
         </div>
       </div>
