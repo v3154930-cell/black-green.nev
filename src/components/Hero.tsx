@@ -58,7 +58,7 @@ export function Hero({ highlightImage }: HeroProps) {
             </Link>
             <Link
               href="/news"
-              className="inline-flex items-center gap-2 rounded-xl border border-[#dfe5e1] bg-white px-4 py-2 text-[var(--text-primary)] hover:border-brand-leaf"
+              className="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-white shadow-soft hover:translate-y-[-1px] transition-transform"
             >
               Чайные новости
             </Link>

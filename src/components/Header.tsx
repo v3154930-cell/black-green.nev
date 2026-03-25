@@ -34,18 +34,19 @@ export function Header() {
           className="h-8 w-auto"
         />
       </div>
-      <nav className="flex flex-wrap gap-4 text-sm sm:text-base">
+      <nav className="flex flex-wrap gap-5 text-sm sm:text-base">
         {navItems.map((item) => (
           <Link
             key={item.href}
             href={item.href}
-            className={`px-1 py-0.5 ${
+            className={`px-1 py-0.5 relative group ${
               isActive(item.href)
-                ? "text-white font-semibold"
+                ? "text-white font-semibold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-[#4ade80] after:rounded-full"
                 : "text-white/80 hover:text-white"
             }`}
           >
             {item.label}
+            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#4ade80]/60 rounded-full transition-all duration-200 group-hover:w-full" />
           </Link>
         ))}
       </nav>
